@@ -125,7 +125,7 @@ resource "aws_security_group" "cloudpulse_sg" {
 
   ingress {
     description = "Allow all internal traffic between cluster nodes"
-    from_port   = 3000
+    from_port   = 3001
     to_port     = 9999
     protocol    = "tcp"
     self        = true
