@@ -71,7 +71,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Service | Link |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Flask Application** | [Click here to Open]($(terraform output -raw app_url)) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Flask Application ** | [Click here to Open]($(terraform output -raw app_url)) |" >> $GITHUB_STEP_SUMMARY
           echo "| **Grafana Dashboard** | [Click here to Open]($(terraform output -raw monitoring_url)) |" >> $GITHUB_STEP_SUMMARY
           echo "| **Locust Load Tester** | [Click here to Open]($(terraform output -raw locust_url)) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
