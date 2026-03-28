@@ -343,7 +343,7 @@ resource "aws_instance" "observability" {
   user_data = <<-EOF
 #!/bin/bash
 # Redirect all output to log file
-exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+exec >>(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 echo "--- Starting User Data Installation ---"
 
