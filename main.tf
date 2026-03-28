@@ -88,48 +88,16 @@ resource "aws_security_group" "cloudpulse_sg" {
   description = "Allow SSH, HTTP, and App ports"
   vpc_id      = aws_vpc.cloudpulse.id
   # Standard SSH & HTTP
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTP"
-    from_port   = 8089
-    to_port     = 8089
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   # Custom Application Ports
   ingress {
     description = "Grafana / Apps"
-    from_port   = 3000
-    to_port     = 3000
+    from_port   = 22
+    to_port     = 9999
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  # --- PRIVATE ACCESS (Self-Referencing) ---
-  # These ports are only reachable BY the instances inside this SG.
 
-  ingress {
-    description = "Allow all internal traffic between cluster nodes"
-    from_port   = 3001
-    to_port     = 9999
-    protocol    = "tcp"
-    self        = true
-  }
 
   egress {
     from_port   = 0
