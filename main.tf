@@ -331,6 +331,7 @@ tags = {
 # ============================================================
 # PHASE 5: Observability (Security Group + Module)
 
+
 resource "aws_instance" "observability" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t3.medium"
