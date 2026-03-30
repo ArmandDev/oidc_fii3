@@ -63,6 +63,15 @@ variable "cloudfront_aliases" {
   default     = ["transit.derherzen.com"]
 }
 
+variable "cloudfront_aliases_high_availability" {
+  description = <<-EOT
+    Alternate domain names when high_availability.tf is the active stack (e.g. high.derherzen.com).
+    Use [] temporarily if you hit CNAMEAlreadyExists until DNS / old distributions are fixed.
+  EOT
+  type        = list(string)
+  default     = ["high.derherzen.com"]
+}
+
 variable "allowed_ssh_cidrs" {
   description = "CIDR blocks allowed to SSH into instances"
   type        = list(string)
