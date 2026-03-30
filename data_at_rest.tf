@@ -165,8 +165,8 @@ resource "aws_security_group" "cloudpulse_sg" {
 
   ingress {
     description     = "App from ALB"
-    from_port       = 8089
-    to_port         = 8089
+    from_port       = 80
+    to_port         = 80
     protocol        = "tcp"
     security_groups = [aws_security_group.alb_sg.id]
   }
@@ -526,7 +526,7 @@ resource "aws_lb" "cloudpulse" {
 
 resource "aws_lb_target_group" "cloudpulse" {
   name     = "${var.project_name}-tg"
-  port     = 8089
+  port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.cloudpulse.id
   health_check {
