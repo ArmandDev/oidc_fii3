@@ -21,6 +21,10 @@ resource "aws_acm_certificate" "transit" {
   domain_name       = "transit.derherzen.com"
   validation_method = "DNS"
   tags              = { Name = "cloudpulse-transit-cert" }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_acm_certificate" "high" {
@@ -29,6 +33,10 @@ resource "aws_acm_certificate" "high" {
   domain_name       = "high.derherzen.com"
   validation_method = "DNS"
   tags              = { Name = "cloudpulse-high-cert" }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_acm_certificate" "disaster" {
@@ -37,6 +45,10 @@ resource "aws_acm_certificate" "disaster" {
   domain_name       = "disaster.derherzen.com"
   validation_method = "DNS"
   tags              = { Name = "cloudpulse-disaster-cert" }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 
