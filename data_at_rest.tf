@@ -58,9 +58,9 @@ resource "aws_kms_key" "cloudpulse" {
         Resource  = "*"
       },
       {
-        Sid       = "Allow EC2 use of the key"
+        Sid       = "Allow EC2 and Auto Scaling use of the key"
         Effect    = "Allow"
-        Principal = { Service = "ec2.amazonaws.com" }
+        Principal = { Service = ["ec2.amazonaws.com", "autoscaling.amazonaws.com"] }
         Action = [
           "kms:Encrypt",
           "kms:Decrypt",
@@ -372,6 +372,7 @@ resource "aws_iam_role_policy" "cloudpulse_access" {
           "kms:Decrypt",
           "kms:DescribeKey",
           "kms:GenerateDataKey",
+          "kms:GenerateDataKeyWithoutPlaintext",
           "kms:CreateGrant",
           "kms:ReEncrypt*"
         ]
