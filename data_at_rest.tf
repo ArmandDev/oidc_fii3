@@ -525,10 +525,15 @@ resource "aws_lb" "cloudpulse" {
 }
 
 resource "aws_lb_target_group" "cloudpulse" {
-  name     = "${var.project_name}-tg"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.cloudpulse.id
+  name_prefix = "${var.project_name}-tg-"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.cloudpulse.id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
   health_check {
     path                = "/"
     interval            = 30
