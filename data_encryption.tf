@@ -649,7 +649,11 @@ resource "aws_lb_listener_rule" "cloudfront_origin_secret_header" {
   }
 }
 
-# CloudFront reaches this internal ALB via VPC Origin (not over the public internet).
+# CloudFront -> internal ALB via VPC Origin (private AWS network, not public internet).
+# Registry docs show https-only + e.g. 8080/8443 as one valid example; those values must
+# match the ALB listeners. We use http-only + port 80 because aws_lb_listener.cloudpulse is HTTP:80 only.
+# To use https-only here, add an HTTPS listener (443) on the ALB with a regional ACM cert, then set
+# origin_protocol_policy = "https-only" and https_port to that listener port.
 resource "aws_cloudfront_vpc_origin" "cloudpulse" {
   vpc_origin_endpoint_config {
     name                   = "${var.project_name}-alb-vpc-origin"
@@ -737,7 +741,7 @@ resource "aws_cloudfront_distribution" "cloudpulse" {
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = ""
-  aliases             = ["transit.derherzen.com"]
+  aliases             = var.cloudfront_aliases
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
     cached_methods   = ["GET", "HEAD"]
@@ -775,11 +779,22 @@ resource "aws_cloudfront_distribution" "cloudpulse" {
       restriction_type = "none"
     }
   }
-  viewer_certificate {
-    acm_certificate_arn      = data.aws_acm_certificate.transit.arn
-    ssl_support_method       = "sni-only"
-    minimum_protocol_version = "TLSv1.2_2021"
+  dynamic "viewer_certificate" {
+    for_each = length(var.cloudfront_aliases) > 0 ? [1] : []
+    content {
+      acm_certificate_arn      = data.aws_acm_certificate.transit.arn
+      ssl_support_method       = "sni-only"
+      minimum_protocol_version = "TLSv1.2_2021"
+    }
   }
+
+  dynamic "viewer_certificate" {
+    for_each = length(var.cloudfront_aliases) == 0 ? [1] : []
+    content {
+      cloudfront_default_certificate = true
+    }
+  }
+
   web_acl_id = aws_wafv2_web_acl.cloudpulse.arn
   tags       = { Name = "${var.project_name}-cf" }
 }
