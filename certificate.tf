@@ -43,20 +43,20 @@ resource "aws_acm_certificate" "disaster" {
 # AWS Managed Grafana Workspace
 # ============================================================
 
-resource "aws_grafana_workspace" "cloudpulse" {
-  provider = aws.us-east-1
+# resource "aws_grafana_workspace" "cloudpulse" {
+#   provider = aws.us-east-1
 
-  name                     = "${var.project_name}-grafana"
-  description              = "Managed Grafana workspace for CloudPulse monitoring"
-  account_access_type      = "CURRENT_ACCOUNT"
-  authentication_providers = ["AWS_SSO"]
-  permission_type          = "SERVICE_MANAGED"
-  data_sources             = ["CLOUDWATCH"]
+#   name                     = "${var.project_name}-grafana"
+#   description              = "Managed Grafana workspace for CloudPulse monitoring"
+#   account_access_type      = "CURRENT_ACCOUNT"
+#   authentication_providers = ["AWS_SSO"]
+#   permission_type          = "SERVICE_MANAGED"
+#   data_sources             = ["CLOUDWATCH"]
 
-  tags = {
-    Name = "${var.project_name}-grafana"
-  }
-}
+#   tags = {
+#     Name = "${var.project_name}-grafana"
+#   }
+# }
 
 # ============================================================
 # Outputs
