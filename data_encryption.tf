@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 }
 
@@ -37,8 +41,15 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-data "aws_prefix_list" "cloudfront_origin" {
+# CloudFront → origin requests use addresses in this AWS-managed prefix list.
+data "aws_ec2_managed_prefix_list" "cloudfront_origin" {
   name = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
+# Shared secret: CloudFront adds it on every origin request; ALB forwards only if it matches.
+resource "random_password" "cloudfront_origin_secret" {
+  length  = 48
+  special = false
 }
 
 data "aws_acm_certificate" "transit" {
@@ -264,7 +275,7 @@ resource "aws_security_group" "alb_sg" {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    prefix_list_ids = [data.aws_prefix_list.cloudfront_origin.id]
+    prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront_origin.id]
   }
 
   egress {
@@ -609,9 +620,32 @@ resource "aws_lb_listener" "cloudpulse" {
   load_balancer_arn = aws_lb.cloudpulse.arn
   port              = "80"
   protocol          = "HTTP"
+
+  # Reject callers that are not CloudFront (wrong secret) or bypass CloudFront (SG blocks anyway).
   default_action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Forbidden"
+      status_code  = "403"
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "cloudfront_origin_secret_header" {
+  listener_arn = aws_lb_listener.cloudpulse.arn
+  priority     = 10
+
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.cloudpulse.arn
+  }
+
+  condition {
+    http_header {
+      http_header_name = "X-CloudPulse-Origin-Verify"
+      values           = [random_password.cloudfront_origin_secret.result]
+    }
   }
 }
 
@@ -674,6 +708,10 @@ resource "aws_cloudfront_distribution" "cloudpulse" {
   origin {
     domain_name = aws_lb.cloudpulse.dns_name
     origin_id   = "ALBOrigin"
+    custom_header {
+      name  = "X-CloudPulse-Origin-Verify"
+      value = random_password.cloudfront_origin_secret.result
+    }
     custom_origin_config {
       http_port              = 80
       https_port             = 443
