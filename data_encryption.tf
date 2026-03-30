@@ -267,7 +267,7 @@ resource "aws_security_group" "cloudpulse_sg" {
 
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
-  description = "Allow HTTP only from CloudFront origin range"
+  description = "Internal ALB — HTTP only from CloudFront (prefix list; use with VPC Origin)"
   vpc_id      = aws_vpc.cloudpulse.id
 
   ingress {
@@ -588,10 +588,10 @@ resource "aws_autoscaling_group" "cloudpulse" {
 
 resource "aws_lb" "cloudpulse" {
   name               = "${var.project_name}-alb"
-  internal           = false
+  internal           = true
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = [aws_subnet.public.id, aws_subnet.public2.id]
+  subnets            = [aws_subnet.private.id, aws_subnet.private2.id]
   tags               = { Name = "${var.project_name}-alb" }
 }
 
@@ -645,6 +645,22 @@ resource "aws_lb_listener_rule" "cloudfront_origin_secret_header" {
     http_header {
       http_header_name = "X-CloudPulse-Origin-Verify"
       values           = [random_password.cloudfront_origin_secret.result]
+    }
+  }
+}
+
+# CloudFront reaches this internal ALB via VPC Origin (not over the public internet).
+resource "aws_cloudfront_vpc_origin" "cloudpulse" {
+  vpc_origin_endpoint_config {
+    name                   = "${var.project_name}-alb-vpc-origin"
+    arn                    = aws_lb.cloudpulse.arn
+    http_port              = 80
+    https_port             = 443
+    origin_protocol_policy = "http-only"
+
+    origin_ssl_protocols {
+      items    = ["TLSv1.2"]
+      quantity = 1
     }
   }
 }
@@ -712,13 +728,12 @@ resource "aws_cloudfront_distribution" "cloudpulse" {
       name  = "X-CloudPulse-Origin-Verify"
       value = random_password.cloudfront_origin_secret.result
     }
-    custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "http-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
+    vpc_origin_config {
+      vpc_origin_id = aws_cloudfront_vpc_origin.cloudpulse.id
     }
   }
+
+  depends_on          = [aws_cloudfront_vpc_origin.cloudpulse]
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = ""
