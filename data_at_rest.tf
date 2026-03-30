@@ -68,7 +68,7 @@ resource "aws_internet_gateway" "cloudpulse" {
 
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.cloudpulse.id
-  cidr_block              = var.public_subnet_cidr
+  cidr_block              = cidrsubnet(var.vpc_cidr, 2, 0)
   availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
   tags                    = { Name = "${var.project_name}-public-subnet" }
@@ -76,7 +76,7 @@ resource "aws_subnet" "public" {
 
 resource "aws_subnet" "public2" {
   vpc_id                  = aws_vpc.cloudpulse.id
-  cidr_block              = "10.0.1.0/26"
+  cidr_block              = cidrsubnet(var.vpc_cidr, 2, 1)
   availability_zone       = data.aws_availability_zones.available.names[1]
   map_public_ip_on_launch = true
   tags                    = { Name = "${var.project_name}-public-subnet2" }
@@ -95,14 +95,14 @@ resource "aws_nat_gateway" "cloudpulse" {
 
 resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.cloudpulse.id
-  cidr_block        = "10.0.2.0/26"
+  cidr_block        = cidrsubnet(var.vpc_cidr, 2, 2)
   availability_zone = data.aws_availability_zones.available.names[0]
   tags              = { Name = "${var.project_name}-private-subnet" }
 }
 
 resource "aws_subnet" "private2" {
   vpc_id            = aws_vpc.cloudpulse.id
-  cidr_block        = "10.0.3.0/26"
+  cidr_block        = cidrsubnet(var.vpc_cidr, 2, 3)
   availability_zone = data.aws_availability_zones.available.names[1]
   tags              = { Name = "${var.project_name}-private-subnet2" }
 }
@@ -152,7 +152,7 @@ resource "aws_route_table_association" "public2" {
 
 resource "aws_security_group" "cloudpulse_sg" {
   name        = "${var.project_name}-sg"
-  description = "App tier — SSH, metrics; app port from ALB only"
+  description = "App tier - SSH, metrics; app port from ALB only"
   vpc_id      = aws_vpc.cloudpulse.id
 
   ingress {
@@ -555,6 +555,7 @@ resource "aws_lb_listener" "cloudpulse" {
 # ============================================================
 
 resource "aws_wafv2_web_acl" "cloudpulse" {
+  provider    = aws.us-east-1
   name        = "${var.project_name}-waf"
   description = "WAF for CloudPulse"
   scope       = "CLOUDFRONT"
