@@ -525,7 +525,7 @@ resource "aws_lb" "cloudpulse" {
 }
 
 resource "aws_lb_target_group" "cloudpulse" {
-  name_prefix = "${var.project_name}-tg-"
+  name_prefix = "cloudp"
   port        = 80
   protocol    = "HTTP"
   vpc_id      = aws_vpc.cloudpulse.id
