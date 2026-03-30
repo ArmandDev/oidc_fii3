@@ -279,10 +279,12 @@ resource "aws_s3_bucket" "cloudpulse" {
 }
 
 resource "aws_s3_object" "background" {
-  bucket       = aws_s3_bucket.cloudpulse.id
-  key          = var.background_image_key
-  source       = var.background_image_path
-  content_type = "image/jpeg"
+  bucket                    = aws_s3_bucket.cloudpulse.id
+  key                       = var.background_image_key
+  source                    = var.background_image_path
+  content_type              = "image/jpeg"
+  server_side_encryption    = "aws:kms"
+  kms_key_id                = aws_kms_key.cloudpulse.arn
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "cloudpulse" {
