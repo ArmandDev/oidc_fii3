@@ -539,6 +539,7 @@ resource "aws_lb_target_group" "cloudpulse" {
   tags = { Name = "${var.project_name}-tg" }
 }
 
+
 resource "aws_lb_listener" "cloudpulse" {
   load_balancer_arn = aws_lb.cloudpulse.arn
   port              = "80"
