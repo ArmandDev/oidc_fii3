@@ -52,6 +52,12 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
+variable "allowed_ssh_cidrs" {
+  description = "CIDR blocks allowed to SSH into instances"
+  type        = list(string)
+  default     = ["0.0.0.0/0"] # Change to your IP for security
+}
+
 variable "common_tags" {
   description = "Tags applied to all resources"
   type        = map(string)
