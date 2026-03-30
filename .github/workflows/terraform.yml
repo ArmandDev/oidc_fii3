@@ -60,6 +60,10 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
 
+      - name: Remove certificates from Terraform state
+        run: |
+          terraform state rm aws_acm_certificate.transit aws_acm_certificate.high aws_acm_certificate.disaster || true
+
       - name: Terraform Destroy
         run: terraform destroy -auto-approve
 
