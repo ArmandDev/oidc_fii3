@@ -48,7 +48,7 @@ def index():
     ny = datetime.datetime.now(timezone('America/New_York')).strftime(fmt)
     ldn = datetime.datetime.now(timezone('Europe/London')).strftime(fmt)
     tky = datetime.datetime.now(timezone('Asia/Tokyo')).strftime(fmt)
-    return f"""<html><head><title>Cloud Pulse</title>
+    html = f"""<html><head><title>Cloud Pulse</title>
     <style>body{{font-family:sans-serif;background:url('/background-image') no-repeat center/cover fixed;color:#fff;text-align:center;margin:0}}
     .box{{background:rgba(0,0,0,.85);display:inline-block;padding:40px;margin-top:100px;border-radius:20px;border:2px solid #ffa500}}
     .clocks{{display:flex;gap:40px;margin:30px 0;justify-content:center}}.clock-item b{{color:#ffa500}}
@@ -59,6 +59,12 @@ def index():
     <div class="clock-item"><b>London</b><br>{ldn}</div>
     <div class="clock-item"><b>Tokyo</b><br>{tky}</div></div>
     <div class="count">Visitors: {count}</div></div></body></html>"""
+    return Response(html, mimetype='text/html', headers={
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, s-maxage=0',
+        'Surrogate-Control': 'no-store',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+    })
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=80)
