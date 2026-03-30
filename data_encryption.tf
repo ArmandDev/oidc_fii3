@@ -267,7 +267,7 @@ resource "aws_security_group" "cloudpulse_sg" {
 
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
-  description = "Internal ALB — HTTP only from CloudFront (prefix list; use with VPC Origin)"
+  description = "Internal ALB - HTTP only from CloudFront (prefix list, VPC Origin)"
   vpc_id      = aws_vpc.cloudpulse.id
 
   ingress {
