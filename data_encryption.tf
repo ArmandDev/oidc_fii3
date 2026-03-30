@@ -37,6 +37,10 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+data "aws_prefix_list" "cloudfront_origin" {
+  name = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
 data "aws_acm_certificate" "transit" {
   provider = aws.us-east-1
 
@@ -252,15 +256,15 @@ resource "aws_security_group" "cloudpulse_sg" {
 
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
-  description = "Allow HTTP from internet"
+  description = "Allow HTTP only from CloudFront origin range"
   vpc_id      = aws_vpc.cloudpulse.id
 
   ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    description     = "HTTP from CloudFront"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    prefix_list_ids = [data.aws_prefix_list.cloudfront_origin.id]
   }
 
   egress {
