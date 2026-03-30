@@ -620,7 +620,6 @@ resource "aws_lb_listener" "cloudpulse" {
   load_balancer_arn = aws_lb.cloudpulse.arn
   port              = "80"
   protocol          = "HTTP"
-
   # Reject callers that are not CloudFront (wrong secret) or bypass CloudFront (SG blocks anyway).
   default_action {
     type = "fixed-response"
