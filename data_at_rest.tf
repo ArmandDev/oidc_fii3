@@ -70,6 +70,31 @@ resource "aws_kms_key" "cloudpulse" {
           "kms:CreateGrant"
         ]
         Resource = "*"
+      },
+      {
+        Sid       = "Allow AWS Auto Scaling service-linked role use of the key"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling" }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid       = "Allow attachment of persistent resources"
+        Effect    = "Allow"
+        Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling" }
+        Action    = "kms:CreateGrant"
+        Resource  = "*"
+        Condition = {
+          Bool = {
+            "kms:GrantIsForAWSResource" = true
+          }
+        }
       }
     ]
   })
