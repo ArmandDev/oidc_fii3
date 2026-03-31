@@ -81,11 +81,12 @@ resource "random_password" "cloudfront_origin_secret" {
 # ---------------------------------------------------------------------------
 # KMS: multi-Region primary + replica for DynamoDB global replica requirement
 # ---------------------------------------------------------------------------
+# Replica must use the same key policy as the primary for EBS/ASG. If policy is
+# omitted on aws_kms_replica_key, AWS applies the default (root-only) policy and
+# ASG launches fail with "EBS volumes are encrypted with an inaccessible KMS key".
 
-resource "aws_kms_key" "cloudpulse" {
-  description  = "CloudPulse MRK primary (DR stack)"
-  multi_region = true
-  policy = jsonencode({
+locals {
+  cloudpulse_kms_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
@@ -100,8 +101,13 @@ resource "aws_kms_key" "cloudpulse" {
         Effect    = "Allow"
         Principal = { Service = ["ec2.amazonaws.com", "autoscaling.amazonaws.com"] }
         Action = [
-          "kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*",
-          "kms:DescribeKey", "kms:CreateGrant"
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey",
+          "kms:GenerateDataKeyWithoutPlaintext",
+          "kms:DescribeKey",
+          "kms:CreateGrant"
         ]
         Resource = "*"
       },
@@ -110,7 +116,11 @@ resource "aws_kms_key" "cloudpulse" {
         Effect    = "Allow"
         Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling" }
         Action = [
-          "kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*",
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey",
+          "kms:GenerateDataKeyWithoutPlaintext",
           "kms:DescribeKey"
         ]
         Resource = "*"
@@ -125,13 +135,20 @@ resource "aws_kms_key" "cloudpulse" {
       }
     ]
   })
-  tags = { Name = "${var.project_name}-kms" }
+}
+
+resource "aws_kms_key" "cloudpulse" {
+  description  = "CloudPulse MRK primary (DR stack)"
+  multi_region = true
+  policy       = local.cloudpulse_kms_policy
+  tags         = { Name = "${var.project_name}-kms" }
 }
 
 resource "aws_kms_replica_key" "cloudpulse_secondary" {
   provider        = aws.secondary
   primary_key_arn = aws_kms_key.cloudpulse.arn
   description     = "CloudPulse MRK replica for ${data.aws_region.secondary.name}"
+  policy          = local.cloudpulse_kms_policy
   tags            = { Name = "${var.project_name}-kms-secondary" }
 }
 
