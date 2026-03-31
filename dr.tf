@@ -339,7 +339,7 @@ resource "aws_route_table_association" "dr_public2" {
 
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
-  description = "Internal ALB — HTTP from CloudFront (prefix list, VPC Origin)"
+  description = "Internal ALB - HTTP from CloudFront (prefix list, VPC Origin)"
   vpc_id      = aws_vpc.cloudpulse.id
 
   ingress {
@@ -360,7 +360,7 @@ resource "aws_security_group" "alb_sg" {
 
 resource "aws_security_group" "cloudpulse_sg" {
   name        = "${var.project_name}-sg"
-  description = "Primary app — from ALB, SSH"
+  description = "Primary app - from ALB, SSH"
   vpc_id      = aws_vpc.cloudpulse.id
 
   ingress {
@@ -403,7 +403,7 @@ resource "aws_security_group" "cloudpulse_sg" {
 resource "aws_security_group" "alb_sg_dr" {
   provider    = aws.secondary
   name        = "${var.project_name}-alb-sg-dr"
-  description = "Internal DR ALB — HTTP from CloudFront (prefix list, VPC Origin)"
+  description = "Internal DR ALB - HTTP from CloudFront (prefix list, VPC Origin)"
   vpc_id      = aws_vpc.cloudpulse_dr.id
 
   ingress {
@@ -425,7 +425,7 @@ resource "aws_security_group" "alb_sg_dr" {
 resource "aws_security_group" "cloudpulse_sg_dr" {
   provider    = aws.secondary
   name        = "${var.project_name}-sg-dr"
-  description = "DR app — from ALB, SSH"
+  description = "DR app - from ALB, SSH"
   vpc_id      = aws_vpc.cloudpulse_dr.id
 
   ingress {
