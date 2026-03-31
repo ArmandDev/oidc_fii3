@@ -814,6 +814,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_healthy_hosts" {
   threshold           = "1"
   alarm_description   = "This metric monitors ALB healthy host count"
   alarm_actions       = []
+  treat_missing_data  = "breaching"
 
   dimensions = {
     LoadBalancer = aws_lb.cloudpulse.arn_suffix
@@ -825,13 +826,14 @@ resource "aws_cloudwatch_metric_alarm" "asg_cpu" {
   alarm_name          = "${var.project_name}-asg-cpu-high"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "2"
-  metric_name         = "CPUUtilization"
-  namespace           = "AWS/EC2"
+  metric_name         = "GroupAverageCPUUtilization"
+  namespace           = "AWS/AutoScaling"
   period              = "300"
   statistic           = "Average"
   threshold           = "80"
   alarm_description   = "This metric monitors ASG CPU utilization"
   alarm_actions       = []
+  treat_missing_data  = "notBreaching"
 
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.cloudpulse.name
@@ -850,6 +852,7 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_5xx" {
   threshold           = "5"
   alarm_description   = "This metric monitors CloudFront 5xx error rate"
   alarm_actions       = []
+  treat_missing_data  = "notBreaching"
 
   dimensions = {
     DistributionId = aws_cloudfront_distribution.cloudpulse.id
@@ -868,6 +871,7 @@ resource "aws_cloudwatch_metric_alarm" "dynamodb_throttled_reads" {
   threshold           = "5"
   alarm_description   = "This metric monitors DynamoDB throttled read requests"
   alarm_actions       = []
+  treat_missing_data  = "notBreaching"
 
   dimensions = {
     TableName = aws_dynamodb_table.cloudpulse.name
