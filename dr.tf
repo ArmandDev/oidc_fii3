@@ -996,9 +996,9 @@ resource "aws_autoscaling_group" "cloudpulse" {
     id      = aws_launch_template.cloudpulse.id
     version = "$Latest"
   }
-  min_size            = 1
-  max_size            = 3
-  desired_capacity    = 1
+  min_size            = 2
+  max_size            = 4
+  desired_capacity    = 2
   vpc_zone_identifier = [aws_subnet.private.id, aws_subnet.private2.id]
   target_group_arns   = [aws_lb_target_group.cloudpulse.arn]
   tag {
@@ -1015,8 +1015,8 @@ resource "aws_autoscaling_group" "cloudpulse_dr" {
     id      = aws_launch_template.cloudpulse_dr.id
     version = "$Latest"
   }
-  min_size            = var.dr_standby_desired_capacity > 0 ? 1 : 0
-  max_size            = 3
+  min_size            = var.dr_standby_desired_capacity > 0 ? var.dr_standby_desired_capacity : 0
+  max_size            = 4
   desired_capacity    = var.dr_standby_desired_capacity
   vpc_zone_identifier = [aws_subnet.dr_private.id, aws_subnet.dr_private2.id]
   target_group_arns   = [aws_lb_target_group.cloudpulse_dr.arn]

@@ -108,9 +108,9 @@ variable "dr_standby_desired_capacity" {
 }
 
 variable "dr_lambda_scale_min_size" {
-  description = "When failover/Capacity Lambda runs, set DR ASG MinSize to this value."
+  description = "When failover/Capacity Lambda runs, set DR ASG MinSize to this value (match primary capacity for parity)."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "dr_lambda_scale_desired_capacity" {
