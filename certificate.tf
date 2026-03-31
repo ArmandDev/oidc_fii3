@@ -5,11 +5,7 @@
 # # Deploy this first to issue certificates before CloudFront distributions.
 # # ============================================================
 
-# # Provider for us-east-1 (required for CloudFront certificates)
-provider "aws" {
-  alias  = "us-east-1"
-  region = "us-east-1"
-}
+# # Provider for us-east-1 is centralized in provider.tf
 
 # # ============================================================
 # # ACM Certificates

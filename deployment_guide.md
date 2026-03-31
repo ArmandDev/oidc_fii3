@@ -166,28 +166,34 @@ This guide provides a step-by-step process for deploying, exploring, and destroy
 
 ## Step 6: Deploy and Explore `dr.tf` (Disaster Recovery)
 
-**Goal**: Full DR with health checks, alarms, Lambda for auto-scaling in secondary region.
+**Goal**: Same **edge pattern as high availability** (internal ALBs in private subnets, CloudFront **VPC origins**, managed prefix list on ALB security groups, shared `X-CloudPulse-Origin-Verify` header), plus **DR**: second full VPC in `eu-west-3`, **global** data (S3 CRR, DynamoDB replica, MRK), **CloudFront origin failover**, and **automatic or manual** capacity failover to the DR Auto Scaling group.
 
 1. **Prepare**:
-   - Uncomment `dr.tf`.
-   - Update `variables.tf`.
-   - **Note**: This assumes secondary region (`eu-west-3`) infra is deployed separately (e.g., run `high_availability.tf` in `eu-west-3` with ASG at 0). For simplicity, the Lambda targets an ASG named `${var.project_name}-asg` in `eu-west-3`.
+   - Comment out every other scenario file that defines the same logical resources (`data_encryption.tf`, `high_availability.tf`, `main.tf`).
+   - Leave `provider.tf`, `variables.tf`, and (if you use it) `certificate.tf` as needed. Providers live only in `provider.tf`.
+   - Ensure an **issued** ACM cert in **us-east-1** for `disaster.derherzen.com` (see Step 0). The stack uses `data.aws_acm_certificate.disaster`.
+   - Optional `variables.tf`: `dr_standby_desired_capacity` (default `0` cold DR), `dr_route53_automatic_failover` (default `true`), `dr_lambda_scale_*` for Lambda targets when alarm/SNS fires.
 
-2. **Enable and Deploy via Pipeline**:
-   - Commit and push the changes.
-   - The pipeline will deploy the infrastructure (~40 minutes).
+2. **Deploy**:
+   - Commit and push (or run `terraform apply` locally with valid AWS credentials).
+   - After apply, read outputs: `dr_cloudfront_domain_name`, `dr_manual_failover_aws_cli`, `dr_manual_lambda_invoke_cli`, `dr_automatic_failover_note`.
 
-3. **DNS Setup**:
-   - For `disaster.derherzen.com` as in previous steps.
+3. **DNS**:
+   - Point `disaster.derherzen.com` (or your chosen alias from `cloudfront_aliases_dr`) at the CloudFront distribution as in earlier steps.
 
-4. **Explore**:
-   - **Route 53 Health Check**: Monitors primary ALB.
-   - **CloudWatch Alarm**: Check alarms in console.
-   - **SNS & Lambda**: Test by triggering alarm (or simulate ALB failure), verify Lambda scales ASG in `eu-west-3`.
-   - **DR Test**: Stop primary ALB/instances, wait for health check failure, check if secondary scales up.
-   - Full multi-region setup.
+4. **Explore — two layers of “failover”**:
+   - **CloudFront origin group**: On configured error status codes (e.g. 5xx), CloudFront tries the **DR** origin (also a VPC origin with the same verify header). If the DR ASG has **no** instances, the DR origin may still fail until you add capacity (below).
+   - **Automatic capacity (optional)**: Because ALBs are **internal**, Route 53 HTTP health checks cannot reach them. Instead, a **CloudWatch alarm** on the primary ALB **`HealthyHostCount`** (namespace `AWS/ApplicationELB`, in your **primary** region) publishes to **SNS** (same region) → **Lambda** in **eu-west-3** scales `${var.project_name}-asg-dr`. Disable the subscription by setting `dr_route53_automatic_failover = false` (the variable name is historical).
+   - **Manual capacity (lab exercises)**:
+     - **Terraform**: set `dr_standby_desired_capacity` to `1` or `2` and apply (warms DR without SNS).
+     - **SNS**: run the `dr_manual_failover_aws_cli` output (same topic the alarm uses).
+     - **Lambda**: run the `dr_manual_lambda_invoke_cli` output (AWS CLI v2 may need `--cli-binary-format raw-in-base64-out` with `--payload '{}'`).
 
-5. **Destroy**:
+5. **Suggested DR test**:
+   - With DR cold (`dr_standby_desired_capacity = 0`), open the app **only via CloudFront** (not the internal ALB DNS from a random client).
+   - Stop primary ASG instances or scale primary to zero; wait for the **HealthyHostCount** alarm or use manual SNS/Lambda; confirm DR ASG receives capacity and CloudFront origin failover can succeed once DR targets are healthy.
+
+6. **Destroy**:
    - Comment out `dr.tf`.
    - Commit and push.
 
