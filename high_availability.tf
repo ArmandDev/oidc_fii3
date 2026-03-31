@@ -3,7 +3,8 @@
 #
 # Base infra (same as data_encryption.tf, do not drift without updating both):
 #   • Terraform + default provider + random; certificate.tf supplies aws.us-east-1
-#   • KMS, VPC (2 public / 2 private AZs), single NAT, IGW, routes
+#   • Multi-Region KMS (primary home region + replica eu-west-3 for DynamoDB replica CMK)
+#   • VPC (2 public / 2 private AZs), single NAT, IGW, routes
 #   • App + ALB security groups (CloudFront prefix list on ALB; app from ALB only)
 #   • Primary S3 bucket: SSE-KMS, deny unencrypted PUT, background object
 #   • DynamoDB PAY_PER_REQUEST, SSE-KMS, table item (visits counter)
@@ -82,7 +83,8 @@ data "aws_acm_certificate" "high" {
 }
 
 resource "aws_kms_key" "cloudpulse" {
-  description = "KMS key for CloudPulse infrastructure encryption"
+  description  = "Multi-Region KMS primary for CloudPulse (home region)"
+  multi_region = true
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -137,6 +139,15 @@ resource "aws_kms_key" "cloudpulse" {
   })
 
   tags = { Name = "${var.project_name}-kms" }
+}
+
+# Same key material as the primary MRK; ARN is regional (required for DynamoDB replica CMK in eu-west-3).
+resource "aws_kms_replica_key" "cloudpulse_secondary" {
+  provider        = aws.secondary
+  primary_key_arn = aws_kms_key.cloudpulse.arn
+  description     = "Replica of ${var.project_name} MRK for eu-west-3 (DynamoDB replica)"
+
+  tags = { Name = "${var.project_name}-kms-secondary" }
 }
 
 
@@ -479,6 +490,7 @@ resource "aws_dynamodb_table" "cloudpulse" {
 
   replica {
     region_name = "eu-west-3"
+    kms_key_arn = aws_kms_replica_key.cloudpulse_secondary.arn
   }
 
   tags = { Name = "${var.project_name}-counter" }
