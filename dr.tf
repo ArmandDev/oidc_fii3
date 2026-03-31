@@ -572,6 +572,9 @@ resource "aws_s3_bucket_replication_configuration" "cloudpulse" {
   ]
 }
 
+# CRR only replicates objects created or updated after the rule exists (no backfill).
+# depends_on ensures order on a fresh apply; stacks where this object predates replication
+# still need a new primary version (e.g. terraform apply -replace=...) or aws_s3_object.background_secondary.
 resource "aws_s3_object" "background" {
   bucket                 = aws_s3_bucket.cloudpulse.id
   key                    = var.background_image_key
@@ -580,6 +583,22 @@ resource "aws_s3_object" "background" {
   server_side_encryption = "aws:kms"
   kms_key_id             = aws_kms_key.cloudpulse.arn
   depends_on             = [aws_s3_bucket_replication_configuration.cloudpulse]
+}
+
+# Same bytes as primary so the eu-west-3 bucket always holds the sample object (CRR may have skipped it earlier).
+resource "aws_s3_object" "background_secondary" {
+  provider               = aws.secondary
+  bucket                 = aws_s3_bucket.cloudpulse_secondary.id
+  key                    = var.background_image_key
+  source                 = var.background_image_path
+  content_type           = "image/jpeg"
+  server_side_encryption = "aws:kms"
+  kms_key_id             = aws_kms_replica_key.cloudpulse_secondary.arn
+  depends_on = [
+    aws_s3_bucket_versioning.cloudpulse_secondary,
+    aws_kms_replica_key.cloudpulse_secondary,
+    aws_s3_object.background,
+  ]
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "cloudpulse" {
@@ -680,7 +699,9 @@ resource "aws_iam_role_policy" "cloudpulse_access" {
         Action = ["s3:GetObject", "s3:ListBucket"]
         Resource = [
           aws_s3_bucket.cloudpulse.arn,
-          "${aws_s3_bucket.cloudpulse.arn}/*"
+          "${aws_s3_bucket.cloudpulse.arn}/*",
+          aws_s3_bucket.cloudpulse_secondary.arn,
+          "${aws_s3_bucket.cloudpulse_secondary.arn}/*",
         ]
       },
       {
@@ -810,7 +831,7 @@ resource "aws_launch_template" "cloudpulse_dr" {
     mkdir -p /home/ec2-user/app
     cat << 'PY_EOF' > /home/ec2-user/app/app.py
     ${templatefile("${path.module}/app.py.tftpl", {
-    bucket_name = aws_s3_bucket.cloudpulse.bucket,
+    bucket_name = aws_s3_bucket.cloudpulse_secondary.bucket,
     table_name  = var.dynamodb_table_name,
     aws_region  = data.aws_region.secondary.name,
     image_key   = var.background_image_key
@@ -865,8 +886,8 @@ resource "aws_lb_target_group" "cloudpulse" {
   lifecycle { create_before_destroy = true }
   health_check {
     path                = "/"
-    interval            = 30
-    timeout             = 5
+    interval            = 5
+    timeout             = 4
     healthy_threshold   = 2
     unhealthy_threshold = 2
   }
@@ -1013,7 +1034,8 @@ resource "aws_sns_topic" "dr_failover" {
 resource "aws_cloudwatch_metric_alarm" "primary_health" {
   alarm_name          = "${var.project_name}-primary-unhealthy-hosts"
   comparison_operator = "LessThanThreshold"
-  evaluation_periods  = 2
+  evaluation_periods  = 1
+  datapoints_to_alarm = 1
   metric_name         = "HealthyHostCount"
   namespace           = "AWS/ApplicationELB"
   period              = 60

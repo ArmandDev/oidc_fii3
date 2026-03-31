@@ -190,7 +190,7 @@ This guide provides a step-by-step process for deploying, exploring, and destroy
      - **Lambda**: run the `dr_manual_lambda_invoke_cli` output (AWS CLI v2 may need `--cli-binary-format raw-in-base64-out` with `--payload '{}'`).
 
 5. **Suggested DR test**:
-   - With DR cold (`dr_standby_desired_capacity = 0`), open the app **only via CloudFront** (not the internal ALB DNS from a random client).
+   - With DR cold (`dr_standby_desired_capacity = 0`), open the app
    - Stop primary ASG instances or scale primary to zero; wait for the **HealthyHostCount** alarm or use manual SNS/Lambda; confirm DR ASG receives capacity and CloudFront origin failover can succeed once DR targets are healthy.
 
 6. **Destroy**:
