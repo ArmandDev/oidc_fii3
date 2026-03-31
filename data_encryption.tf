@@ -840,6 +840,7 @@ resource "aws_cloudwatch_metric_alarm" "asg_cpu" {
 
 resource "aws_cloudwatch_metric_alarm" "cloudfront_5xx" {
   alarm_name          = "${var.project_name}-cloudfront-5xx"
+  provider            = aws.us-east-1
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "1"
   metric_name         = "5xxErrorRate"
