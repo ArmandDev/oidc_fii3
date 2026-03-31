@@ -1218,8 +1218,9 @@ resource "aws_cloudfront_distribution" "cloudpulse" {
   default_root_object = ""
   aliases             = var.cloudfront_aliases_dr
 
+  # Origin groups only allow GET, HEAD, OPTIONS on the behavior (no POST/PUT/PATCH/DELETE).
   default_cache_behavior {
-    allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    allowed_methods  = ["GET", "HEAD", "OPTIONS"]
     cached_methods   = ["GET", "HEAD"]
     target_origin_id = "app-failover"
     forwarded_values {
