@@ -38,10 +38,10 @@
 #   region = var.aws_region
 # }
 
-# provider "aws" {
-#   alias  = "secondary"
-#   region = "eu-west-3"
-# }
+provider "aws" {
+  alias  = "secondary"
+  region = "eu-west-3"
+}
 
 # data "aws_caller_identity" "current" {}
 # data "aws_region" "current" {}
