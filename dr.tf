@@ -67,6 +67,12 @@ data "aws_ec2_managed_prefix_list" "cloudfront_origin" {
   name = "com.amazonaws.global.cloudfront.origin-facing"
 }
 
+# Prefix list IDs are per-region; DR ALB SG must use the list ID from aws.secondary.
+data "aws_ec2_managed_prefix_list" "cloudfront_origin_secondary" {
+  provider = aws.secondary
+  name     = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
 resource "random_password" "cloudfront_origin_secret" {
   length  = 48
   special = false
@@ -411,7 +417,7 @@ resource "aws_security_group" "alb_sg_dr" {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront_origin.id]
+    prefix_list_ids = [data.aws_ec2_managed_prefix_list.cloudfront_origin_secondary.id]
   }
   egress {
     from_port   = 0
@@ -591,9 +597,12 @@ resource "aws_s3_bucket_policy" "cloudpulse_encryption_enforce" {
 # ---------------------------------------------------------------------------
 
 resource "aws_dynamodb_table" "cloudpulse" {
-  name         = var.dynamodb_table_name
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "id"
+  name           = var.dynamodb_table_name
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "id"
+  stream_enabled = true
+  # Global tables require a stream; omitting this makes Terraform try to disable it on update.
+  stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
     name = "id"
