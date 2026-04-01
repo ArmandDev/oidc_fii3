@@ -1,6 +1,7 @@
 # ============================================================
 # CloudPulse Infrastructure — Session 3
 # Region: var.aws_region (default eu-west-2). Provider: provider.tf
+# AWS names use var.main_stack_name / main_* (not var.project_name) so this stack does not collide with dr.tf.
 # ============================================================
 
 data "aws_caller_identity" "current" {}
@@ -34,12 +35,12 @@ resource "aws_vpc" "cloudpulse" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
-  tags                 = { Name = "${var.project_name}-vpc" }
+  tags                 = { Name = "${var.main_stack_name}-vpc" }
 }
 
 resource "aws_internet_gateway" "cloudpulse" {
   vpc_id = aws_vpc.cloudpulse.id
-  tags   = { Name = "${var.project_name}-igw" }
+  tags   = { Name = "${var.main_stack_name}-igw" }
 }
 
 resource "aws_subnet" "public" {
@@ -47,7 +48,7 @@ resource "aws_subnet" "public" {
   cidr_block              = var.public_subnet_cidr
   availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
-  tags                    = { Name = "${var.project_name}-public-subnet" }
+  tags                    = { Name = "${var.main_stack_name}-public-subnet" }
 }
 
 resource "aws_route_table" "public" {
@@ -56,7 +57,7 @@ resource "aws_route_table" "public" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.cloudpulse.id
   }
-  tags = { Name = "${var.project_name}-public-rt" }
+  tags = { Name = "${var.main_stack_name}-public-rt" }
 }
 
 resource "aws_route_table_association" "public" {
@@ -73,7 +74,7 @@ resource "aws_route_table_association" "public" {
 # ============================================================
 
 resource "aws_security_group" "cloudpulse_sg" {
-  name        = "${var.project_name}-sg"
+  name        = "${var.main_stack_name}-sg"
   description = "Allow SSH, HTTP, and App ports"
   vpc_id      = aws_vpc.cloudpulse.id
   # Standard SSH & HTTP
@@ -127,12 +128,12 @@ resource "aws_security_group" "cloudpulse_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.project_name}-sg" }
+  tags = { Name = "${var.main_stack_name}-sg" }
 }
 
 resource "aws_s3_bucket" "cloudpulse" {
-  bucket = "${var.s3_bucket_prefix}-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}"
-  tags   = { Name = "${var.project_name}-assets" }
+  bucket = "${var.main_s3_bucket_prefix}-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}"
+  tags   = { Name = "${var.main_stack_name}-assets" }
 }
 
 resource "aws_s3_object" "background" {
@@ -150,7 +151,7 @@ resource "aws_s3_object" "background" {
 
 
 resource "aws_dynamodb_table" "cloudpulse" {
-  name         = var.dynamodb_table_name
+  name         = var.main_dynamodb_table_name
   billing_mode = "PAY_PER_REQUEST" # No capacity planning — you pay only for actual reads/writes
   hash_key     = "id"
 
@@ -159,7 +160,7 @@ resource "aws_dynamodb_table" "cloudpulse" {
     type = "S"
   }
 
-  tags = { Name = "${var.project_name}-counter" }
+  tags = { Name = "${var.main_stack_name}-counter" }
 }
 
 resource "aws_dynamodb_table_item" "visits" {
@@ -189,7 +190,7 @@ ITEM
 
 
 resource "aws_iam_role" "cloudpulse_ec2" {
-  name = "${var.project_name}-instance-role"
+  name = "${var.main_stack_name}-instance-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -200,7 +201,7 @@ resource "aws_iam_role" "cloudpulse_ec2" {
 }
 
 resource "aws_iam_role_policy" "cloudpulse_access" {
-  name = "${var.project_name}-access-policy"
+  name = "${var.main_stack_name}-access-policy"
   role = aws_iam_role.cloudpulse_ec2.id
   policy = jsonencode({
     Version = "2012-10-17"
@@ -228,7 +229,7 @@ resource "aws_iam_role_policy_attachment" "cloudpulse_ec2_ssm_core" {
 }
 
 resource "aws_iam_instance_profile" "cloudpulse" {
-  name       = "${var.project_name}-instance-profile"
+  name       = "${var.main_stack_name}-instance-profile"
   role       = aws_iam_role.cloudpulse_ec2.name
   depends_on = [aws_iam_role_policy_attachment.cloudpulse_ec2_ssm_core]
 }
@@ -264,7 +265,7 @@ resource "aws_instance" "cloudpulse" {
     cat << 'PY_EOF' > /home/ec2-user/app/app.py
     ${templatefile("${path.module}/app.py.tftpl", {
   bucket_name = aws_s3_bucket.cloudpulse.bucket,
-  table_name  = var.dynamodb_table_name,
+  table_name  = var.main_dynamodb_table_name,
   aws_region  = var.aws_region,
   image_key   = var.background_image_key
 })}
@@ -337,7 +338,7 @@ resource "aws_instance" "cloudpulse" {
           - localhost
         labels:
           job: cloudpulse
-          instance: ${var.project_name}-server
+          instance: ${var.main_stack_name}-server
           __path__: /home/ec2-user/app/app.log
     PROM_EOF
 
@@ -362,7 +363,7 @@ resource "aws_instance" "cloudpulse" {
   EOF
 
 tags = {
-  Name = "${var.project_name}-server"
+  Name = "${var.main_stack_name}-server"
 }
 }
 
@@ -464,7 +465,7 @@ docker compose up -d
 echo "--- User Data Script Complete ---"
 EOF
 
-tags = { Name = "${var.project_name}-monitoring" }
+tags = { Name = "${var.main_stack_name}-monitoring" }
 }
 
 # ============================================================

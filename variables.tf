@@ -5,9 +5,27 @@ variable "aws_region" {
 }
 
 variable "project_name" {
-  description = "Project name used for tagging and naming"
+  description = "Name prefix for DR stack (dr.tf): tags, IAM, ASG, etc. Session 3 (main.tf) uses var.main_stack_name instead so resources do not clash."
   type        = string
   default     = "cloudpulse"
+}
+
+variable "main_stack_name" {
+  description = "Name prefix for Session 3 only (main.tf): VPC/SG/IAM/EC2 tags and names. Separate from var.project_name so main and DR never share the same AWS resource names."
+  type        = string
+  default     = "cloudpulse-session3"
+}
+
+variable "main_s3_bucket_prefix" {
+  description = "S3 bucket name prefix for main.tf only; suffix is account ID and region (same pattern as DR’s var.s3_bucket_prefix)."
+  type        = string
+  default     = "cloudpulse-session3-assets"
+}
+
+variable "main_dynamodb_table_name" {
+  description = "DynamoDB table name for the Session 3 app (main.tf). Distinct from var.dynamodb_table_name used when DR resources are enabled."
+  type        = string
+  default     = "CloudPulseCounterSession3"
 }
 
 variable "vpc_cidr" {
@@ -23,7 +41,7 @@ variable "public_subnet_cidr" {
 }
 
 variable "s3_bucket_prefix" {
-  description = "Prefix for the S3 bucket (account ID + region + -an appended automatically)"
+  description = "S3 bucket name prefix for DR stack (dr.tf) when those resources are enabled; main.tf uses var.main_s3_bucket_prefix."
   type        = string
   default     = "cloudpulse-assets"
 }
@@ -41,7 +59,7 @@ variable "background_image_key" {
 }
 
 variable "dynamodb_table_name" {
-  description = "Name of the DynamoDB table"
+  description = "DynamoDB table name for DR stack (dr.tf) when enabled; main.tf uses var.main_dynamodb_table_name."
   type        = string
   default     = "CloudPulseCounter"
 }
