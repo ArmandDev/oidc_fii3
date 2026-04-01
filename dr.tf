@@ -705,9 +705,13 @@ resource "aws_iam_role_policy" "cloudpulse_access" {
         ]
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:PutItem"]
-        Resource = aws_dynamodb_table.cloudpulse.arn
+        Effect = "Allow"
+        Action = ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:PutItem"]
+        # Global table: primary .arn is home region only; DR instances call the local replica ARN.
+        Resource = [
+          aws_dynamodb_table.cloudpulse.arn,
+          "arn:aws:dynamodb:${data.aws_region.secondary.name}:${data.aws_caller_identity.current.account_id}:table/${var.dynamodb_table_name}",
+        ]
       },
       {
         Effect = "Allow"
