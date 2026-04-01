@@ -52,26 +52,6 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
-variable "cloudfront_aliases" {
-  description = <<-EOT
-    Alternate domain names (CNAMEs) for the CloudFront distribution.
-    Use [] temporarily if AWS returns CNAMEAlreadyExists: remove the name from any other distribution
-    and fix DNS so it does not point at another CloudFront domain, then set back to e.g. ["transit.derherzen.com"].
-    When empty, the distribution uses the default *.cloudfront.net certificate (HTTPS still works on that hostname).
-  EOT
-  type        = list(string)
-  default     = ["transit.derherzen.com"]
-}
-
-variable "cloudfront_aliases_high_availability" {
-  description = <<-EOT
-    Alternate domain names when high_availability.tf is the active stack (e.g. high.derherzen.com).
-    Use [] temporarily if you hit CNAMEAlreadyExists until DNS / old distributions are fixed.
-  EOT
-  type        = list(string)
-  default     = ["high.derherzen.com"]
-}
-
 variable "allowed_ssh_cidrs" {
   description = "CIDR blocks allowed to SSH into instances"
   type        = list(string)

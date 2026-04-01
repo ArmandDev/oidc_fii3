@@ -1,17 +1,22 @@
 # ============================================================
-# CloudPulse — Disaster recovery (student lab)
+# CloudPulse — single consolidated stack (student lab)
 #
-# Use ONLY with other scenario files commented out (data_encryption, HA, main).
-# Requires: provider.tf, certificate.tf (ACM in us-east-1), variables.tf, app.py.tftpl
+# This file replaces the old split scenarios (data_encryption.tf,
+# high_availability.tf). It is the only active root module besides
+# provider.tf, variables.tf, and outputs.tf.
 #
-# Pattern (same edge style as high_availability / data_encryption):
-#   • Primary + DR: 2 public + 2 private AZs, NAT, internal ALB in private subnets
-#   • ALB ingress: CloudFront managed prefix list only; listener 403 + header rule → targets
-#   • CloudFront: VPC origins + shared X-CloudPulse-Origin-Verify header; origin failover group
-#   • Global data: S3 CRR + DynamoDB replica (MRK per replica region)
-#   • Automatic capacity: CloudWatch ALB HealthyHostCount (primary) → SNS → Lambda scales DR ASG
-#     (Route 53 HTTP checks cannot reach internal ALBs, so no R53 health check here.)
-#   • Manual: Terraform var dr_standby_desired_capacity, or SNS publish, or aws lambda invoke
+# Included in one place:
+#   • Primary VPC (2 public / 2 private AZs), NAT, internal ALB
+#   • Data at rest: SSE-KMS (S3, DynamoDB, EBS), bucket deny unencrypted PUT, MRK + replica key in DR region
+#   • HA-style edge: ASG min 2 in primary, CloudFront VPC origins, WAF, verify header on ALB listener
+#   • Multi-region data: S3 CRR + DynamoDB global replica (same table name in both regions; IAM allows both ARNs)
+#   • DR: full second VPC in aws.secondary (see provider.tf; default region eu-west-3),
+#     cold/warm DR ASG, CloudFront origin group failover, SNS + Lambda scale-out on primary HealthyHostCount
+#
+# Requires: issued ACM cert in us-east-1 for the hostname in data.aws_acm_certificate.disaster (default disaster.derherzen.com).
+# Optional: uncomment certificate.tf to manage that cert via Terraform instead of a data source.
+#
+# Legacy main.tf (minimal unencrypted lab) remains in the repo commented out; do not enable it together with this file.
 # ============================================================
 
 data "aws_caller_identity" "current" {}
@@ -78,12 +83,6 @@ resource "random_password" "cloudfront_origin_secret" {
   special = false
 }
 
-# ---------------------------------------------------------------------------
-# KMS: multi-Region primary + replica for DynamoDB global replica requirement
-# ---------------------------------------------------------------------------
-# Replica must use the same key policy as the primary for EBS/ASG. If policy is
-# omitted on aws_kms_replica_key, AWS applies the default (root-only) policy and
-# ASG launches fail with "EBS volumes are encrypted with an inaccessible KMS key".
 
 locals {
   cloudpulse_kms_policy = jsonencode({
@@ -152,9 +151,6 @@ resource "aws_kms_replica_key" "cloudpulse_secondary" {
   tags            = { Name = "${var.project_name}-kms-secondary" }
 }
 
-# ---------------------------------------------------------------------------
-# PRIMARY region — network (matches HA-style layout)
-# ---------------------------------------------------------------------------
 
 resource "aws_vpc" "cloudpulse" {
   cidr_block           = var.vpc_cidr
@@ -247,9 +243,6 @@ resource "aws_route_table_association" "public2" {
   route_table_id = aws_route_table.public.id
 }
 
-# ---------------------------------------------------------------------------
-# DR region — same layout as primary (public + private + NAT)
-# ---------------------------------------------------------------------------
 
 resource "aws_vpc" "cloudpulse_dr" {
   provider             = aws.secondary
@@ -356,9 +349,6 @@ resource "aws_route_table_association" "dr_public2" {
   route_table_id = aws_route_table.dr_public.id
 }
 
-# ---------------------------------------------------------------------------
-# Security groups
-# ---------------------------------------------------------------------------
 
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
@@ -481,10 +471,6 @@ resource "aws_security_group" "cloudpulse_sg_dr" {
   tags = { Name = "${var.project_name}-sg-dr" }
 }
 
-# ---------------------------------------------------------------------------
-# S3 + CRR
-# ---------------------------------------------------------------------------
-
 resource "aws_iam_role" "s3_replication" {
   name = "${var.project_name}-s3-replication-role"
   assume_role_policy = jsonencode({
@@ -572,9 +558,6 @@ resource "aws_s3_bucket_replication_configuration" "cloudpulse" {
   ]
 }
 
-# CRR only replicates objects created or updated after the rule exists (no backfill).
-# depends_on ensures order on a fresh apply; stacks where this object predates replication
-# still need a new primary version (e.g. terraform apply -replace=...) or aws_s3_object.background_secondary.
 resource "aws_s3_object" "background" {
   bucket                 = aws_s3_bucket.cloudpulse.id
   key                    = var.background_image_key
@@ -585,7 +568,6 @@ resource "aws_s3_object" "background" {
   depends_on             = [aws_s3_bucket_replication_configuration.cloudpulse]
 }
 
-# Same bytes as primary so the eu-west-3 bucket always holds the sample object (CRR may have skipped it earlier).
 resource "aws_s3_object" "background_secondary" {
   provider               = aws.secondary
   bucket                 = aws_s3_bucket.cloudpulse_secondary.id
@@ -628,16 +610,11 @@ resource "aws_s3_bucket_policy" "cloudpulse_encryption_enforce" {
   })
 }
 
-# ---------------------------------------------------------------------------
-# DynamoDB global replica
-# ---------------------------------------------------------------------------
-
 resource "aws_dynamodb_table" "cloudpulse" {
   name           = var.dynamodb_table_name
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "id"
   stream_enabled = true
-  # Global tables require a stream; omitting this makes Terraform try to disable it on update.
   stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
@@ -672,10 +649,6 @@ ITEM
   }
 }
 
-# ---------------------------------------------------------------------------
-# IAM — EC2 (shared by primary + DR launch templates)
-# ---------------------------------------------------------------------------
-
 resource "aws_iam_role" "cloudpulse_ec2" {
   name = "${var.project_name}-instance-role"
   assume_role_policy = jsonencode({
@@ -707,7 +680,6 @@ resource "aws_iam_role_policy" "cloudpulse_access" {
       {
         Effect = "Allow"
         Action = ["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:PutItem"]
-        # Global table: primary .arn is home region only; DR instances call the local replica ARN.
         Resource = [
           aws_dynamodb_table.cloudpulse.arn,
           "arn:aws:dynamodb:${data.aws_region.secondary.name}:${data.aws_caller_identity.current.account_id}:table/${var.dynamodb_table_name}",
@@ -1261,7 +1233,6 @@ resource "aws_cloudfront_distribution" "cloudpulse" {
   default_root_object = ""
   aliases             = var.cloudfront_aliases_dr
 
-  # Origin groups only allow GET, HEAD, OPTIONS on the behavior (no POST/PUT/PATCH/DELETE).
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD", "OPTIONS"]
     cached_methods   = ["GET", "HEAD"]
@@ -1316,10 +1287,6 @@ resource "aws_cloudfront_distribution" "cloudpulse" {
   web_acl_id = aws_wafv2_web_acl.cloudpulse.arn
   tags       = { Name = "${var.project_name}-cf-dr" }
 }
-
-# ---------------------------------------------------------------------------
-# Outputs — URLs and failover commands for students
-# ---------------------------------------------------------------------------
 
 output "dr_cloudfront_domain_name" {
   description = "HTTPS URL host (append https://). Uses origin failover: primary ALB then DR ALB."
