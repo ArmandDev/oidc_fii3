@@ -228,8 +228,9 @@ resource "aws_iam_role_policy_attachment" "cloudpulse_ec2_ssm_core" {
 }
 
 resource "aws_iam_instance_profile" "cloudpulse" {
-  name = "${var.project_name}-instance-profile"
-  role = aws_iam_role.cloudpulse_ec2.name
+  name       = "${var.project_name}-instance-profile"
+  role       = aws_iam_role.cloudpulse_ec2.name
+  depends_on = [aws_iam_role_policy_attachment.cloudpulse_ec2_ssm_core]
 }
 
 resource "aws_instance" "cloudpulse" {
@@ -238,12 +239,19 @@ resource "aws_instance" "cloudpulse" {
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.cloudpulse_sg.id]
   iam_instance_profile        = aws_iam_instance_profile.cloudpulse.name
+  associate_public_ip_address = true
   private_ip                  = "10.0.0.10"
   user_data_replace_on_change = true
+
+  depends_on = [aws_iam_role_policy_attachment.cloudpulse_ec2_ssm_core]
 
   user_data = <<-EOF
     #!/bin/bash
     exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+
+    # SSM agent (credentials available after IAM profile attach at launch)
+    systemctl enable amazon-ssm-agent
+    systemctl restart amazon-ssm-agent
 
     # 1. Install App dependencies
     yum update -y
@@ -385,6 +393,9 @@ resource "aws_instance" "observability" {
 exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 echo "--- Starting User Data Installation ---"
+
+systemctl enable amazon-ssm-agent
+systemctl restart amazon-ssm-agent
 
 # 1. Install Docker & Compose Plugin
 yum update -y
