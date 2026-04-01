@@ -1042,10 +1042,10 @@ resource "aws_cloudwatch_metric_alarm" "primary_health" {
   datapoints_to_alarm = 1
   metric_name         = "HealthyHostCount"
   namespace           = "AWS/ApplicationELB"
-  period              = 60
+  period              = 10
   statistic           = "Average"
   threshold           = 1
-  alarm_description   = "Primary internal ALB has fewer than 1 healthy target; SNS can invoke DR scale-up Lambda"
+  alarm_description   = "Primary internal ALB HealthyHostCount < 1 for 1 datapoint within 10s; SNS can invoke DR scale-up Lambda"
   alarm_actions       = [aws_sns_topic.dr_failover.arn]
   treat_missing_data  = "breaching"
   dimensions = {
