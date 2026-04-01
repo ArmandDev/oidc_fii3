@@ -611,10 +611,10 @@ resource "aws_s3_bucket_policy" "cloudpulse_encryption_enforce" {
 }
 
 resource "aws_dynamodb_table" "cloudpulse" {
-  name           = var.dynamodb_table_name
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
-  stream_enabled = true
+  name             = var.dynamodb_table_name
+  billing_mode     = "PAY_PER_REQUEST"
+  hash_key         = "id"
+  stream_enabled   = true
   stream_view_type = "NEW_AND_OLD_IMAGES"
 
   attribute {
