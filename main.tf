@@ -182,6 +182,9 @@ ITEM
 
 # ============================================================
 # PHASE 4: IAM + EC2
+# SSM: AmazonSSMManagedInstanceCore → Session Manager (after apply, wait ~1–2 min
+# for agent to show Online). EC2 Instance Connect still needs your IAM identity to
+# allow ec2-instance-connect:SendSSHPublicKey and SG port 22 per allowed_ssh_cidrs.
 # ============================================================
 
 
@@ -216,6 +219,12 @@ resource "aws_iam_role_policy" "cloudpulse_access" {
       }
     ]
   })
+}
+
+# Session Manager + SSM inventory (required for "online" in Systems Manager)
+resource "aws_iam_role_policy_attachment" "cloudpulse_ec2_ssm_core" {
+  role       = aws_iam_role.cloudpulse_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "cloudpulse" {
@@ -354,11 +363,12 @@ tags = {
 
 
 resource "aws_instance" "observability" {
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "c7i-flex.large"
-  subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.cloudpulse_sg.id]
-  private_ip             = "10.0.0.20"
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = "c7i-flex.large"
+  subnet_id                   = aws_subnet.public.id
+  vpc_security_group_ids      = [aws_security_group.cloudpulse_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.cloudpulse.name
+  private_ip                  = "10.0.0.20"
 
   root_block_device {
     volume_size           = 20
