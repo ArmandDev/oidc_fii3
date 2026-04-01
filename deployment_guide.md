@@ -2,7 +2,7 @@
 
 This repo uses **one** active Terraform scenario: **`dr.tf`**. That file bundles what used to live in separate **data-at-rest encryption** and **high-availability** stacks, plus **multi-region DR**. The narrative lives in the banner comment at the top of `dr.tf`.
 
-**Active files:** `provider.tf`, `variables.tf`, `dr.tf`, `outputs.tf` (optional). **`main.tf`** is a commented legacy minimal lab; do not uncomment it alongside `dr.tf`.
+**Active files:** `provider.tf`, `variables.tf`, `dr.tf`. DR outputs are defined at the bottom of `dr.tf`. **`main.tf`** is the Session 3 lab (with its own outputs at the bottom of that file); do not enable it alongside `dr.tf`.
 
 ## Prerequisites
 
