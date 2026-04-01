@@ -101,7 +101,7 @@ variable "dr_lambda_scale_desired_capacity" {
 
 variable "dr_route53_automatic_failover" {
   description = <<-EOT
-    When true, CloudWatch alarm on the primary internal ALB HealthyHostCount publishes to SNS (in var.aws_region),
+    When true, CloudWatch alarm on the primary ASG GroupInServiceInstances (ALARM when 0) publishes to SNS (in var.aws_region),
     which invokes the DR Lambda to scale the secondary ASG. (Name is historical; Route 53 HTTP checks are not used for internal ALBs.)
     Set false to use only manual triggers (Terraform capacity, SNS publish, or Lambda invoke).
   EOT

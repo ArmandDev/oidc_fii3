@@ -25,7 +25,7 @@ This repo uses **one** active Terraform scenario: **`dr.tf`**. That file bundles
 - **Encryption**: S3 / DynamoDB / EBS SSE-KMS; S3 deny unencrypted PUT; MRK + replica key in DR region.
 - **HA in primary**: Multi-AZ ASG (e.g. min 2), internal ALB, CloudFront **VPC origins**, WAF, shared verify header.
 - **Global data**: S3 CRR and DynamoDB global table replica (see `dr.tf` and AWS console).
-- **Failover**: CloudFront **origin group** (HTTP errors) + optional **CloudWatch** primary `HealthyHostCount` → **SNS** → **Lambda** scales DR ASG (see `dr_route53_automatic_failover`).
+- **Failover**: CloudFront **origin group** (HTTP errors) + optional **CloudWatch** primary ASG **`GroupInServiceInstances`** (ALARM when **0**) → **SNS** → **Lambda** scales DR ASG (see `dr_route53_automatic_failover`).
 
 Suggested DR test: cold DR (`dr_standby_desired_capacity = 0`), hit the app, break primary targets, trigger alarm or manual SNS/Lambda, confirm DR capacity and origin failover.
 

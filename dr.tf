@@ -11,7 +11,7 @@
 #   • HA-style edge: ASG min 2 in primary, CloudFront VPC origins, WAF, verify header on ALB listener
 #   • Multi-region data: S3 CRR + DynamoDB global replica (same table name in both regions; IAM allows both ARNs)
 #   • DR: full second VPC in aws.secondary (see provider.tf; default region eu-west-3),
-#     cold/warm DR ASG, CloudFront origin group failover, SNS + Lambda scale-out on primary HealthyHostCount
+#     cold/warm DR ASG, CloudFront origin group failover, SNS + Lambda scale-out when primary ASG GroupInServiceInstances = 0
 #
 # Requires: issued ACM cert in us-east-1 for the hostname in data.aws_acm_certificate.disaster (default disaster.derherzen.com).
 # Optional: uncomment certificate.tf to manage that cert via Terraform instead of a data source.
@@ -972,6 +972,7 @@ resource "aws_autoscaling_group" "cloudpulse" {
     id      = aws_launch_template.cloudpulse.id
     version = "$Latest"
   }
+  enabled_metrics     = ["GroupInServiceInstances"]
   min_size            = 2
   max_size            = 4
   desired_capacity    = 2
@@ -1008,21 +1009,20 @@ resource "aws_sns_topic" "dr_failover" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "primary_health" {
-  alarm_name          = "${var.project_name}-primary-unhealthy-hosts"
+  alarm_name          = "${var.project_name}-primary-asg-zero-in-service"
   comparison_operator = "LessThanThreshold"
   evaluation_periods  = 1
   datapoints_to_alarm = 1
-  metric_name         = "HealthyHostCount"
-  namespace           = "AWS/ApplicationELB"
-  period              = 10
+  metric_name         = "GroupInServiceInstances"
+  namespace           = "AWS/AutoScaling"
+  period              = 60
   statistic           = "Average"
   threshold           = 1
-  alarm_description   = "Primary internal ALB HealthyHostCount < 1 for 1 datapoint within 10s; SNS can invoke DR scale-up Lambda"
+  alarm_description   = "Primary ASG has zero InService instances (GroupInServiceInstances < 1 for 1 minute); SNS can invoke DR scale-up Lambda. OK when at least one instance is InService."
   alarm_actions       = [aws_sns_topic.dr_failover.arn]
-  treat_missing_data  = "breaching"
+  treat_missing_data  = "missing"
   dimensions = {
-    LoadBalancer = aws_lb.cloudpulse.arn_suffix
-    TargetGroup  = aws_lb_target_group.cloudpulse.arn_suffix
+    AutoScalingGroupName = aws_autoscaling_group.cloudpulse.name
   }
 }
 
@@ -1304,7 +1304,7 @@ output "dr_secondary_alb_dns" {
 }
 
 output "dr_primary_failover_alarm_name" {
-  description = "CloudWatch alarm on primary ALB HealthyHostCount (triggers SNS in var.aws_region when unhealthy)."
+  description = "CloudWatch alarm on primary ASG GroupInServiceInstances (ALARM when 0, OK when >= 1); publishes to SNS in var.aws_region."
   value       = aws_cloudwatch_metric_alarm.primary_health.alarm_name
 }
 
@@ -1325,5 +1325,5 @@ output "dr_manual_lambda_invoke_cli" {
 
 output "dr_automatic_failover_note" {
   description = "How automatic failover is wired (for lab write-ups)."
-  value       = "Primary internal ALB AWS/ApplicationELB HealthyHostCount alarm in ${data.aws_region.current.name} → SNS → Lambda in ${data.aws_region.secondary.name} scales DR ASG. CloudFront uses HA-style VPC origins + origin header, and origin group fails over on configured HTTP errors when DR has healthy targets. Toggle subscription with var.dr_route53_automatic_failover."
+  value       = "Primary ASG AWS/AutoScaling GroupInServiceInstances alarm in ${data.aws_region.current.name} (ALARM when 0 InService) → SNS → Lambda in ${data.aws_region.secondary.name} scales DR ASG. CloudFront uses HA-style VPC origins + origin header, and origin group fails over on configured HTTP errors when DR has healthy targets. Toggle subscription with var.dr_route53_automatic_failover."
 }
