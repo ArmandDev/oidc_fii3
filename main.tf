@@ -1,6 +1,6 @@
 # ============================================================
 # CloudPulse Infrastructure — Session 3
-# (Provider versions: provider.tf)
+# Region: var.aws_region (default eu-west-2). Provider: provider.tf
 # ============================================================
 
 data "aws_caller_identity" "current" {}

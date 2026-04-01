@@ -6,7 +6,7 @@ This repo uses **one** active Terraform scenario: **`dr.tf`**. That file bundles
 
 ## Prerequisites
 
-1. **AWS**: CI/CD or local credentials with permissions for VPC, EC2, ALB, ASG, S3, DynamoDB, KMS, CloudFront, WAF, SNS, Lambda, IAM, etc. Default primary region: `eu-north-1` (`variables.tf` → `aws_region`). DR workloads use `aws.secondary` (**eu-west-3** in `provider.tf`).
+1. **AWS**: CI/CD or local credentials with permissions for VPC, EC2, ALB, ASG, S3, DynamoDB, KMS, CloudFront, WAF, SNS, Lambda, IAM, etc. Session 3 / `main.tf` default region: **`eu-west-2`** (`variables.tf` → `aws_region`). DR workloads use `aws.secondary` (**eu-west-3** in `provider.tf`). Remote state S3 backend region stays as configured in `provider.tf` (may differ from deploy region).
 
 2. **ACM (us-east-1)**: CloudFront needs a certificate in **us-east-1** for your public hostname. `dr.tf` uses `data.aws_acm_certificate.disaster` (default domain `disaster.derherzen.com`). Issue and validate that cert before apply, or uncomment resources in `certificate.tf` if you want Terraform to own the cert.
 

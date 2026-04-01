@@ -84,13 +84,13 @@ In your forked GitHub repository:
 1. Go to Settings > Secrets and variables > Actions.
 2. Add the following secrets:
    - `ROLE_TO_ASSUME`: The ARN of the IAM role created in step 2.
-   - `AWS_REGION`: The AWS region where you want to deploy (`eu-north-1`).
+   - `AWS_REGION`: Region for the GitHub Actions AWS session; use **`eu-west-2`** to match the default `var.aws_region` for the `main.tf` stack (or override with `TF_VAR_aws_region`).
 
 ### 4. Create S3 Bucket for Terraform State
 
 1. In the AWS Management Console, create a new S3 bucket:
    - Bucket name: Choose a unique name (e.g., `your-username-oidc-fii-state`).
-   - Region: `eu-north-1`.
+   - Region: same as the `region` in `provider.tf` `backend "s3"` (currently **`eu-north-1`** in this repo—can differ from the workload region **`eu-west-2`**).
 
 2. In the `provider.tf` file, replace `YOUR_BUCKET_NAME` with your actual S3 bucket name.
 

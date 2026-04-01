@@ -1,7 +1,7 @@
 variable "aws_region" {
-  description = "AWS region to deploy into"
+  description = "AWS region for the default provider (Session 3 / main.tf stack). For CI, align GitHub secret AWS_REGION with this when possible."
   type        = string
-  default     = "eu-north-1"
+  default     = "eu-west-2"
 }
 
 variable "project_name" {
