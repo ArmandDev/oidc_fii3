@@ -40,7 +40,7 @@
 #   owners      = ["amazon"]
 #   filter {
 #     name   = "name"
-#     values = ["al2023-ami-*-x86_64"]
+#     values = ["al2023-ami-20*-kernel-*-x86_64"]
 #   }
 #   filter {
 #     name   = "virtualization-type"
@@ -54,7 +54,7 @@
 #   owners      = ["amazon"]
 #   filter {
 #     name   = "name"
-#     values = ["al2023-ami-*-x86_64"]
+#     values = ["al2023-ami-20*-kernel-*-x86_64"]
 #   }
 #   filter {
 #     name   = "virtualization-type"

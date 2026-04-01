@@ -14,9 +14,11 @@ data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
 
+  # Standard AL2023 only: `al2023-ami-*-x86_64` also matches minimal (`al2023-ami-minimal-*`),
+  # and most_recent often picked minimal. Require release version right after `al2023-ami-`.
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["al2023-ami-20*-kernel-*-x86_64"]
   }
 
   filter {
