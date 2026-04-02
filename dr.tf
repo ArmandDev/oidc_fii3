@@ -165,11 +165,9 @@ locals {
         Sid       = "Allow CloudWatch alarm actions to encrypted SNS"
         Effect    = "Allow"
         Principal = { Service = "cloudwatch.amazonaws.com" }
-        Action = [
-          "kms:Decrypt", "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext", "kms:DescribeKey"
-        ]
-        Resource  = "*"
-        Condition = { StringEquals = { "kms:CallerAccount" = data.aws_caller_identity.current.account_id } }
+        # Omit kms:CallerAccount — CloudWatch alarm→encrypted SNS often fails evaluation with that condition.
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"]
+        Resource = "*"
       },
       {
         Sid       = "Allow Lambda environment encryption"
@@ -1125,6 +1123,56 @@ resource "aws_autoscaling_group" "dr_asg_secondary" {
 resource "aws_sns_topic" "dr_failover" {
   name              = "${var.dr_stack_name}-dr-failover"
   kms_master_key_id = aws_kms_key.dr_kms_mrk.id
+}
+
+# Encrypted topics need an explicit sns:Publish grant for CloudWatch; without it alarms fail with KMS-style errors.
+data "aws_iam_policy_document" "dr_failover_sns" {
+  statement {
+    sid    = "TopicOwnerAccess"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+    actions = [
+      "SNS:Publish",
+      "SNS:RemovePermission",
+      "SNS:SetTopicAttributes",
+      "SNS:DeleteTopic",
+      "SNS:ListSubscriptionsByTopic",
+      "SNS:GetTopicAttributes",
+      "SNS:AddPermission",
+      "SNS:Subscribe",
+      "SNS:Receive",
+    ]
+    resources = [aws_sns_topic.dr_failover.arn]
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceOwner"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  statement {
+    sid    = "AllowCloudWatchAlarmPublish"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.dr_failover.arn]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "dr_failover" {
+  arn    = aws_sns_topic.dr_failover.arn
+  policy = data.aws_iam_policy_document.dr_failover_sns.json
 }
 
 resource "aws_cloudwatch_metric_alarm" "primary_health" {
