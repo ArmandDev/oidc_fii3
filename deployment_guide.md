@@ -1,39 +1,80 @@
-# CloudPulse — deployment guide (DR stack only)
+# CloudPulse — deployment guide
 
-This repo uses **one** active Terraform scenario: **`dr.tf`**. That file bundles what used to live in separate **data-at-rest encryption** and **high-availability** stacks, plus **multi-region DR**. The narrative lives in the banner comment at the top of `dr.tf`.
 
-**Active files:** `provider.tf`, `variables.tf`, `dr.tf`. DR outputs are defined at the bottom of `dr.tf`. **`main.tf`** is the Session 3 lab (with its own outputs at the bottom of that file); do not enable it alongside `dr.tf`.
+
+**Active Terraform:** `main.tf` (Session 3 lab) and `dr.tf` (encryption + HA + multi-region DR) together. They use **separate provider aliases** and **distinct name prefixes** so one `terraform apply` can deploy both.
+
+
+
+**Regions (defaults):**
+
+
+
+- **Session 3** → `var.main_aws_region` (**`eu-west-1`**), provider **`aws.main`**.
+
+- **DR primary** (VPC, ALB, ASG, SNS, …) → `var.aws_region` (**`eu-west-2`**), default **`aws`**.
+
+- **DR secondary** (replica VPC, replica bucket, Lambda, …) → `var.dr_secondary_region` (**`eu-west-3`**), provider **`aws.secondary`**.
+
+
+
+Outputs: Session 3 at the bottom of `main.tf`; DR at the bottom of `dr.tf`.
+
+
 
 ## Prerequisites
 
-1. **AWS**: CI/CD or local credentials with permissions for VPC, EC2, ALB, ASG, S3, DynamoDB, KMS, CloudFront, WAF, SNS, Lambda, IAM, etc. Session 3 / `main.tf` default region: **`eu-west-2`** (`variables.tf` → `aws_region`). DR workloads use `aws.secondary` (**eu-west-3** in `provider.tf`). Remote state S3 backend region stays as configured in `provider.tf` (may differ from deploy region).
 
-2. **ACM (us-east-1)**: CloudFront needs a certificate in **us-east-1** for your public hostname. `dr.tf` uses `data.aws_acm_certificate.disaster` (default domain `disaster.derherzen.com`). Issue and validate that cert before apply, or uncomment resources in `certificate.tf` if you want Terraform to own the cert.
 
-3. **DNS**: Add validation CNAMEs while the cert is pending; after deploy, CNAME your app hostname to the CloudFront domain from Terraform output `dr_cloudfront_domain_name`.
+1. **AWS**: Permissions for VPC, EC2, ALB, ASG, S3, DynamoDB, KMS, CloudFront, WAF, SNS, Lambda, IAM, etc., in **all three** workload regions above (or adjust variables). Remote state S3 backend region in `provider.tf` may differ.
 
-4. **`variables.tf`**: Set `allowed_ssh_cidrs` to your IP if you use SSH. Tune `dr_standby_desired_capacity`, `dr_route53_automatic_failover`, and `dr_lambda_scale_*` as needed.
+
+
+2. **ACM (us-east-1)**: CloudFront needs a certificate in **us-east-1** for your public hostname. `dr.tf` uses `data.aws_acm_certificate.disaster` (default `disaster.derherzen.com`). Issue and validate that cert before apply, or use `certificate.tf` if you want Terraform to own the cert.
+
+
+
+3. **DNS**: Validation CNAMEs for ACM; after deploy, CNAME your hostname to the CloudFront domain from `dr_cloudfront_domain_name`.
+
+
+
+4. **`variables.tf`**: Set `allowed_ssh_cidrs` as needed. Tune `dr_standby_desired_capacity`, `dr_route53_automatic_failover`, and `dr_lambda_scale_*` for DR.
+
+
 
 ## Deploy
 
-1. Ensure only **`dr.tf`** defines infrastructure (not `main.tf`).
-2. `terraform init` / push through pipeline → `terraform apply`.
-3. Outputs to use: `dr_cloudfront_domain_name`, `dr_manual_failover_aws_cli`, `dr_manual_lambda_invoke_cli`, `dr_automatic_failover_note`, alarm name output if present.
+
+
+1. `terraform init` → `terraform apply` (pipeline or local).
+
+2. Session 3 URLs: `app_url`, `monitoring_url`, `locust_url` from `main.tf`.
+
+3. DR: `dr_cloudfront_domain_name`, `dr_manual_failover_aws_cli`, `dr_manual_lambda_invoke_cli`, `dr_automatic_failover_note`, etc.
+
+
 
 ## What to explore
 
-- **Encryption**: S3 / DynamoDB / EBS SSE-KMS; S3 deny unencrypted PUT; MRK + replica key in DR region.
-- **HA in primary**: Multi-AZ ASG (e.g. min 2), internal ALB, CloudFront **VPC origins**, WAF, shared verify header.
-- **Global data**: S3 CRR and DynamoDB global table replica (see `dr.tf` and AWS console).
-- **Failover**: CloudFront **origin group** (HTTP errors) + optional **CloudWatch** primary ASG **`GroupInServiceInstances`** (ALARM when **0**) → **SNS** → **Lambda** scales DR ASG (see `dr_route53_automatic_failover`).
 
-Suggested DR test: cold DR (`dr_standby_desired_capacity = 0`), hit the app, break primary targets, trigger alarm or manual SNS/Lambda, confirm DR capacity and origin failover.
+
+See the banner in `dr.tf` for the full DR narrative (encryption, HA, CRR, global DynamoDB, failover). Session 3 adds the simple two-instance observability lab in **`eu-west-1`**.
+
+
 
 ## Destroy
 
-- Remove or comment `dr.tf` resources (or `terraform destroy` with this workspace), then clean up DNS if you no longer need the hostname.
+
+
+`terraform destroy` removes resources tracked in state (expect a long run). **KMS:** the multi-Region key and its replica use `lifecycle { prevent_destroy = true }`, so Terraform will not delete them until you remove that block (or remove those resources from state). That preserves one long-lived CMK while still using the same state bucket and OIDC role. Clean up DNS if you no longer need the hostname.
+
+
 
 ## Cleanup notes
 
-- **`certificate.tf`** is optional and mostly commented; if you manage certs outside Terraform, leave it as-is.
-- Costs: multi-region and CloudFront/WAF add billing; tear down when finished.
+
+
+- **`certificate.tf`** is optional and mostly commented if you manage certs outside Terraform.
+
+- Costs: three regions + CloudFront/WAF add billing; tear down when finished.
+

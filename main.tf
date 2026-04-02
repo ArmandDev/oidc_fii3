@@ -1,16 +1,22 @@
 # ============================================================
 # CloudPulse Infrastructure — Session 3
-# Region: var.aws_region (default eu-west-2). Provider: provider.tf
+# Region: var.main_aws_region (default eu-west-1) via provider aws.main. See provider.tf.
 # AWS names use var.main_stack_name / main_* (not var.project_name) so this stack does not collide with dr.tf.
 # ============================================================
 
 data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
-data "aws_availability_zones" "available" {
-  state = "available"
+
+data "aws_region" "main" {
+  provider = aws.main
+}
+
+data "aws_availability_zones" "main" {
+  provider = aws.main
+  state    = "available"
 }
 
 data "aws_ami" "amazon_linux" {
+  provider    = aws.main
   most_recent = true
   owners      = ["amazon"]
 
@@ -34,6 +40,7 @@ data "aws_ami" "amazon_linux" {
 
 
 resource "aws_vpc" "cloudpulse" {
+  provider             = aws.main
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
@@ -41,20 +48,23 @@ resource "aws_vpc" "cloudpulse" {
 }
 
 resource "aws_internet_gateway" "cloudpulse" {
-  vpc_id = aws_vpc.cloudpulse.id
-  tags   = { Name = "${var.main_stack_name}-igw" }
+  provider = aws.main
+  vpc_id   = aws_vpc.cloudpulse.id
+  tags     = { Name = "${var.main_stack_name}-igw" }
 }
 
 resource "aws_subnet" "public" {
+  provider                = aws.main
   vpc_id                  = aws_vpc.cloudpulse.id
   cidr_block              = var.public_subnet_cidr
-  availability_zone       = data.aws_availability_zones.available.names[0]
+  availability_zone       = data.aws_availability_zones.main.names[0]
   map_public_ip_on_launch = true
   tags                    = { Name = "${var.main_stack_name}-public-subnet" }
 }
 
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.cloudpulse.id
+  provider = aws.main
+  vpc_id   = aws_vpc.cloudpulse.id
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.cloudpulse.id
@@ -63,6 +73,7 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
+  provider       = aws.main
   subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
 }
@@ -76,6 +87,7 @@ resource "aws_route_table_association" "public" {
 # ============================================================
 
 resource "aws_security_group" "cloudpulse_sg" {
+  provider    = aws.main
   name        = "${var.main_stack_name}-sg"
   description = "Allow SSH, HTTP, and App ports"
   vpc_id      = aws_vpc.cloudpulse.id
@@ -134,11 +146,13 @@ resource "aws_security_group" "cloudpulse_sg" {
 }
 
 resource "aws_s3_bucket" "cloudpulse" {
-  bucket = "${var.main_s3_bucket_prefix}-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}"
-  tags   = { Name = "${var.main_stack_name}-assets" }
+  provider = aws.main
+  bucket   = "${var.main_s3_bucket_prefix}-${data.aws_caller_identity.current.account_id}-${data.aws_region.main.name}"
+  tags     = { Name = "${var.main_stack_name}-assets" }
 }
 
 resource "aws_s3_object" "background" {
+  provider     = aws.main
   bucket       = aws_s3_bucket.cloudpulse.id
   key          = var.background_image_key
   source       = var.background_image_path
@@ -153,6 +167,7 @@ resource "aws_s3_object" "background" {
 
 
 resource "aws_dynamodb_table" "cloudpulse" {
+  provider     = aws.main
   name         = var.main_dynamodb_table_name
   billing_mode = "PAY_PER_REQUEST" # No capacity planning — you pay only for actual reads/writes
   hash_key     = "id"
@@ -166,6 +181,7 @@ resource "aws_dynamodb_table" "cloudpulse" {
 }
 
 resource "aws_dynamodb_table_item" "visits" {
+  provider   = aws.main
   table_name = aws_dynamodb_table.cloudpulse.name
   hash_key   = aws_dynamodb_table.cloudpulse.hash_key
 
@@ -192,7 +208,8 @@ ITEM
 
 
 resource "aws_iam_role" "cloudpulse_ec2" {
-  name = "${var.main_stack_name}-instance-role"
+  provider = aws.main
+  name     = "${var.main_stack_name}-instance-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -203,8 +220,9 @@ resource "aws_iam_role" "cloudpulse_ec2" {
 }
 
 resource "aws_iam_role_policy" "cloudpulse_access" {
-  name = "${var.main_stack_name}-access-policy"
-  role = aws_iam_role.cloudpulse_ec2.id
+  provider = aws.main
+  name     = "${var.main_stack_name}-access-policy"
+  role     = aws_iam_role.cloudpulse_ec2.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -226,17 +244,20 @@ resource "aws_iam_role_policy" "cloudpulse_access" {
 
 # Session Manager + SSM inventory (required for "online" in Systems Manager)
 resource "aws_iam_role_policy_attachment" "cloudpulse_ec2_ssm_core" {
+  provider   = aws.main
   role       = aws_iam_role.cloudpulse_ec2.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "cloudpulse" {
+  provider   = aws.main
   name       = "${var.main_stack_name}-instance-profile"
   role       = aws_iam_role.cloudpulse_ec2.name
   depends_on = [aws_iam_role_policy_attachment.cloudpulse_ec2_ssm_core]
 }
 
 resource "aws_instance" "cloudpulse" {
+  provider                    = aws.main
   ami                         = data.aws_ami.amazon_linux.id
   instance_type               = var.instance_type
   subnet_id                   = aws_subnet.public.id
@@ -374,6 +395,7 @@ tags = {
 
 
 resource "aws_instance" "observability" {
+  provider               = aws.main
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "c7i-flex.large"
   subnet_id              = aws_subnet.public.id

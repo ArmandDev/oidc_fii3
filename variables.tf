@@ -1,17 +1,35 @@
 variable "aws_region" {
-  description = "AWS region for the default provider (Session 3 / main.tf stack). For CI, align GitHub secret AWS_REGION with this when possible."
+  description = "AWS region for the default provider: DR primary (dr.tf). Session 3 uses var.main_aws_region via provider alias aws.main."
   type        = string
   default     = "eu-west-2"
 }
 
+variable "main_aws_region" {
+  description = "Region for Session 3 stack (main.tf); wired as provider aws.main."
+  type        = string
+  default     = "eu-west-1"
+}
+
+variable "dr_secondary_region" {
+  description = "Region for DR secondary VPC, S3 replica bucket, Lambda, etc. (provider aws.secondary)."
+  type        = string
+  default     = "eu-west-3"
+}
+
 variable "project_name" {
-  description = "Name prefix for DR stack (dr.tf): tags, IAM, ASG, etc. Session 3 (main.tf) uses var.main_stack_name instead so resources do not clash."
+  description = "Optional legacy name; DR stack uses var.dr_stack_name for AWS resource names."
   type        = string
   default     = "cloudpulse"
 }
 
+variable "dr_stack_name" {
+  description = "Name prefix for DR stack (dr.tf): tags, IAM, ALB, ASG, etc. Distinct from var.main_stack_name (Session 3)."
+  type        = string
+  default     = "cloudpulse-dr"
+}
+
 variable "main_stack_name" {
-  description = "Name prefix for Session 3 only (main.tf): VPC/SG/IAM/EC2 tags and names. Separate from var.project_name so main and DR never share the same AWS resource names."
+  description = "Name prefix for Session 3 only (main.tf): VPC/SG/IAM/EC2 tags and names. DR uses var.dr_stack_name."
   type        = string
   default     = "cloudpulse-session3"
 }
@@ -41,9 +59,9 @@ variable "public_subnet_cidr" {
 }
 
 variable "s3_bucket_prefix" {
-  description = "S3 bucket name prefix for DR stack (dr.tf) when those resources are enabled; main.tf uses var.main_s3_bucket_prefix."
+  description = "S3 bucket name prefix for DR stack (dr.tf); main.tf uses var.main_s3_bucket_prefix."
   type        = string
-  default     = "cloudpulse-assets"
+  default     = "cloudpulse-dr-assets"
 }
 
 variable "background_image_path" {
@@ -59,9 +77,9 @@ variable "background_image_key" {
 }
 
 variable "dynamodb_table_name" {
-  description = "DynamoDB table name for DR stack (dr.tf) when enabled; main.tf uses var.main_dynamodb_table_name."
+  description = "DynamoDB table name for DR global table (dr.tf); main.tf uses var.main_dynamodb_table_name."
   type        = string
-  default     = "CloudPulseCounter"
+  default     = "CloudPulseCounterDR"
 }
 
 variable "instance_type" {
@@ -119,7 +137,7 @@ variable "dr_lambda_scale_desired_capacity" {
 
 variable "dr_route53_automatic_failover" {
   description = <<-EOT
-    When true, CloudWatch alarm on the primary ASG GroupInServiceInstances (ALARM when 0) publishes to SNS (in var.aws_region),
+    When true, CloudWatch alarm on the primary ASG GroupInServiceInstances (ALARM when 0) publishes to SNS (in var.aws_region / DR primary),
     which invokes the DR Lambda to scale the secondary ASG. (Name is historical; Route 53 HTTP checks are not used for internal ALBs.)
     Set false to use only manual triggers (Terraform capacity, SNS publish, or Lambda invoke).
   EOT

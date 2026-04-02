@@ -29,11 +29,16 @@ provider "aws" {
 }
 
 provider "aws" {
+  alias  = "main"
+  region = var.main_aws_region
+}
+
+provider "aws" {
   alias  = "us-east-1"
   region = "us-east-1"
 }
 
 provider "aws" {
   alias  = "secondary"
-  region = "eu-west-3"
+  region = var.dr_secondary_region
 }
