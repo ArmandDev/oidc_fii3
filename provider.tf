@@ -31,6 +31,12 @@ provider "aws" {
 provider "aws" {
   alias  = "main"
   region = var.main_aws_region
+
+  # S3 HeadObject returns 301 if the client uses the global/legacy endpoint while the
+  # bucket lives in this region (common when CI sets AWS_REGION to another region).
+  endpoints {
+    s3 = "https://s3.${var.main_aws_region}.amazonaws.com"
+  }
 }
 
 provider "aws" {
