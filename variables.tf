@@ -34,6 +34,7 @@ variable "main_stack_name" {
   default     = "cloudpulse-session3"
 }
 
+
 variable "main_s3_bucket_prefix" {
   description = "S3 bucket name prefix for main.tf only; suffix is account ID and region (same pattern as DR’s var.s3_bucket_prefix)."
   type        = string
