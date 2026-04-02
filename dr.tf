@@ -1,4 +1,4 @@
-﻿# # ============================================================
+# # ============================================================
 # # CloudPulse — single consolidated stack (instructor / custom domain)
 # #
 # # For labs without ACM or custom DNS, use dr_no_certs.tf instead — not both.
