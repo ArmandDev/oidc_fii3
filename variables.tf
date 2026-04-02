@@ -7,13 +7,13 @@ variable "aws_region" {
 variable "main_aws_region" {
   description = "Region for Session 3 stack (main.tf); wired as provider aws.main."
   type        = string
-  default     = "eu-west-1"
+  default     = "us-east-1"
 }
 
 variable "dr_secondary_region" {
   description = "Region for DR secondary VPC, S3 replica bucket, Lambda, etc. (provider aws.secondary)."
   type        = string
-  default     = "eu-west-3"
+  default     = "us-east-1"
 }
 
 variable "project_name" {
