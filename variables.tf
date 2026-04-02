@@ -113,7 +113,7 @@ variable "dr_vpc_cidr" {
 }
 
 variable "cloudfront_aliases_dr" {
-  description = "CloudFront CNAMEs for the DR scenario (e.g. disaster.derherzen.com). Use [] for default *.cloudfront.net only."
+  description = "CloudFront CNAMEs for the DR scenario when using dr.tf with ACM (e.g. disaster.derherzen.com). Ignored by dr_no_certs.tf (always default *.cloudfront.net). Use [] with dr.tf for default certificate only."
   type        = list(string)
   default     = ["disaster.derherzen.com"]
 }

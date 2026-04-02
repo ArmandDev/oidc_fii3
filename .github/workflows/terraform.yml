@@ -48,6 +48,10 @@ jobs:
       - name: Terraform Format
         run: terraform fmt -check
 
+      # dr.tf and dr_no_certs.tf are mutually exclusive (duplicate addresses). This pipeline deploys the instructor stack (dr.tf only).
+      - name: Exclude student DR file (dr_no_certs.tf)
+        run: mv dr_no_certs.tf dr_no_certs.tf.excluded 2>/dev/null || true
+
       - name: Terraform Initialize
         run: terraform init
 

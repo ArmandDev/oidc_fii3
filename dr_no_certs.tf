@@ -1,24 +1,17 @@
 # ============================================================
-# CloudPulse — single consolidated stack (instructor / custom domain)
+# CloudPulse — DR stack for students (NO custom TLS / ACM / DNS certs)
 #
-# For labs without ACM or custom DNS, use dr_no_certs.tf instead — not both.
+# Load EITHER this file OR dr.tf — never both (duplicate resource addresses).
+# Typical student workflow: remove or rename dr.tf, keep dr_no_certs.tf.
 #
-# This file replaces the old split scenarios (data_encryption.tf,
-# high_availability.tf). It is active together with main.tf: DR primary uses
-# var.aws_region (default eu-west-2); secondary uses aws.secondary (var.dr_secondary_region).
+# CloudFront uses the default *.cloudfront.net certificate only (no ACM lookup,
+# no custom aliases, no certificate.tf). Access the app via the distribution
+# domain from output dr_cloudfront_domain_name.
 #
-# Included in one place:
-#   • Primary VPC (2 public / 2 private AZs), NAT, internal ALB
-#   • Data at rest: SSE-KMS (S3, DynamoDB, EBS), bucket deny unencrypted PUT, MRK + replica key in DR region
-#   • HA-style edge: ASG min 2 in primary, CloudFront VPC origins, WAF, verify header on ALB listener
-#   • Multi-region data: S3 CRR + DynamoDB global replica (same table name in both regions; IAM allows both ARNs)
-#   • DR: full second VPC in aws.secondary (see provider.tf; var.dr_secondary_region),
-#     cold/warm DR ASG, CloudFront origin group failover, SNS + Lambda (same region as SNS) scale-out when primary ASG GroupInServiceInstances = 0; Lambda calls Auto Scaling in aws.secondary
+# Same topology as dr.tf otherwise: DR primary uses var.aws_region (default
+# eu-west-2); secondary uses aws.secondary (var.dr_secondary_region).
 #
-# Requires: issued ACM cert in us-east-1 for the hostname in data.aws_acm_certificate.disaster (default disaster.derherzen.com).
-# Optional: uncomment certificate.tf to manage that cert via Terraform instead of a data source.
-#
-# Resource names use var.dr_stack_name; Session 3 uses var.main_stack_name (see main.tf).
+# Resource names use var.dr_stack_name; Session 3 uses var.main_stack_name (main.tf).
 # ============================================================
 
 data "aws_region" "dr_primary" {}
@@ -61,12 +54,6 @@ data "aws_ami" "dr_amazon_linux_secondary" {
     name   = "virtualization-type"
     values = ["hvm"]
   }
-}
-
-data "aws_acm_certificate" "disaster" {
-  provider = aws.us-east-1
-  domain   = "disaster.derherzen.com"
-  statuses = ["ISSUED"]
 }
 
 data "aws_ec2_managed_prefix_list" "cloudfront_origin" {
@@ -1408,7 +1395,7 @@ resource "aws_cloudfront_distribution" "dr_cf_dist" {
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = ""
-  aliases             = var.cloudfront_aliases_dr
+  aliases             = []
 
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD", "OPTIONS"]
@@ -1445,20 +1432,8 @@ resource "aws_cloudfront_distribution" "dr_cf_dist" {
     }
   }
 
-  dynamic "viewer_certificate" {
-    for_each = length(var.cloudfront_aliases_dr) > 0 ? [1] : []
-    content {
-      acm_certificate_arn      = data.aws_acm_certificate.disaster.arn
-      ssl_support_method       = "sni-only"
-      minimum_protocol_version = "TLSv1.2_2021"
-    }
-  }
-
-  dynamic "viewer_certificate" {
-    for_each = length(var.cloudfront_aliases_dr) == 0 ? [1] : []
-    content {
-      cloudfront_default_certificate = true
-    }
+  viewer_certificate {
+    cloudfront_default_certificate = true
   }
 
   web_acl_id = aws_wafv2_web_acl.dr_waf.arn
