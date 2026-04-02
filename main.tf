@@ -289,7 +289,7 @@ resource "aws_instance" "cloudpulse" {
     ${templatefile("${path.module}/app.py.tftpl", {
   bucket_name = aws_s3_bucket.cloudpulse.bucket,
   table_name  = var.main_dynamodb_table_name,
-  aws_region  = var.aws_region,
+  aws_region  = var.main_aws_region,
   image_key   = var.background_image_key
 })}
     PY_EOF
