@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS region for the default provider: DR primary (dr.tf). Session 3 uses var.main_aws_region via provider alias aws.main."
   type        = string
-  default     = "eu-west-2"
+  default     = "us-east-1"
 }
 
 variable "main_aws_region" {
