@@ -608,6 +608,14 @@ resource "aws_s3_bucket_replication_configuration" "dr_s3_replication" {
     status = "Enabled"
     filter {}
     delete_marker_replication { status = "Disabled" }
+
+    # AWS requires this when destination.encryption_configuration is set (KMS → KMS CRR).
+    source_selection_criteria {
+      sse_kms_encrypted_objects {
+        status = "Enabled"
+      }
+    }
+
     destination {
       bucket        = aws_s3_bucket.dr_s3_secondary.arn
       storage_class = "STANDARD"
