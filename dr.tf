@@ -11,7 +11,7 @@
 #   • HA-style edge: ASG min 2 in primary, CloudFront VPC origins, WAF, verify header on ALB listener
 #   • Multi-region data: S3 CRR + DynamoDB global replica (same table name in both regions; IAM allows both ARNs)
 #   • DR: full second VPC in aws.secondary (see provider.tf; var.dr_secondary_region),
-#     cold/warm DR ASG, CloudFront origin group failover, SNS + Lambda scale-out when primary ASG GroupInServiceInstances = 0
+#     cold/warm DR ASG, CloudFront origin group failover, SNS + Lambda (same region as SNS) scale-out when primary ASG GroupInServiceInstances = 0; Lambda calls Auto Scaling in aws.secondary
 #
 # Requires: issued ACM cert in us-east-1 for the hostname in data.aws_acm_certificate.disaster (default disaster.derherzen.com).
 # Optional: uncomment certificate.tf to manage that cert via Terraform instead of a data source.
@@ -180,7 +180,7 @@ locals {
           "kms:DescribeKey", "kms:CreateGrant", "kms:ReEncrypt*"
         ]
         Resource  = "*"
-        Condition = { StringEquals = { "kms:ViaService" = "lambda.${data.aws_region.secondary.name}.amazonaws.com" } }
+        Condition = { StringEquals = { "kms:ViaService" = "lambda.${data.aws_region.dr_primary.name}.amazonaws.com" } }
       }
     ]
   })
@@ -1189,18 +1189,13 @@ resource "aws_iam_role_policy" "lambda_dr" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "arn:aws:logs:${data.aws_region.secondary.name}:${data.aws_caller_identity.current.account_id}:*"
+        Resource = "arn:aws:logs:${data.aws_region.dr_primary.name}:${data.aws_caller_identity.current.account_id}:*"
       },
       {
         Effect = "Allow"
         Action = [
           "kms:Decrypt", "kms:DescribeKey", "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext"
         ]
-        Resource = aws_kms_replica_key.dr_kms_replica.arn
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:DescribeKey"]
         Resource = aws_kms_key.dr_kms_mrk.arn
       }
     ]
@@ -1208,16 +1203,17 @@ resource "aws_iam_role_policy" "lambda_dr" {
 }
 
 resource "aws_lambda_function" "dr_scale_up" {
-  provider         = aws.secondary
+  # Must live in the same region as aws_sns_topic.dr_failover — SNS cannot invoke Lambda cross-region.
   function_name    = "${var.dr_stack_name}-dr-scale-up"
   runtime          = "python3.11"
   handler          = "index.lambda_handler"
   role             = aws_iam_role.lambda_dr.arn
-  kms_key_arn      = aws_kms_replica_key.dr_kms_replica.arn
+  kms_key_arn      = aws_kms_key.dr_kms_mrk.arn
   filename         = data.archive_file.dr_scale_up.output_path
   source_code_hash = data.archive_file.dr_scale_up.output_base64sha256
   environment {
     variables = {
+      ASG_REGION       = data.aws_region.secondary.name
       ASG_NAME         = aws_autoscaling_group.dr_asg_secondary.name
       DESIRED_CAPACITY = tostring(var.dr_lambda_scale_desired_capacity)
       MIN_SIZE         = tostring(var.dr_lambda_scale_min_size)
@@ -1236,7 +1232,6 @@ resource "aws_sns_topic_subscription" "dr_lambda" {
 
 resource "aws_lambda_permission" "dr_sns" {
   count         = var.dr_route53_automatic_failover ? 1 : 0
-  provider      = aws.secondary
   statement_id  = "AllowExecutionFromSNS"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.dr_scale_up.function_name
@@ -1452,10 +1447,10 @@ output "dr_manual_failover_aws_cli" {
 
 output "dr_manual_lambda_invoke_cli" {
   description = "Manual failover: invoke the DR Lambda directly (scales the DR Auto Scaling group)."
-  value       = "aws lambda invoke --region ${data.aws_region.secondary.name} --function-name ${aws_lambda_function.dr_scale_up.function_name} --payload '{}' dr_response.json"
+  value       = "aws lambda invoke --region ${data.aws_region.dr_primary.name} --function-name ${aws_lambda_function.dr_scale_up.function_name} --payload '{}' dr_response.json"
 }
 
 output "dr_automatic_failover_note" {
   description = "How automatic failover is wired (for lab write-ups)."
-  value       = "Primary ASG AWS/AutoScaling GroupInServiceInstances alarm in ${data.aws_region.dr_primary.name} (ALARM when 0 InService) → SNS → Lambda in ${data.aws_region.secondary.name} scales DR ASG. CloudFront uses HA-style VPC origins + origin header, and origin group fails over on configured HTTP errors when DR has healthy targets. Toggle subscription with var.dr_route53_automatic_failover."
+  value       = "Primary ASG AWS/AutoScaling GroupInServiceInstances alarm in ${data.aws_region.dr_primary.name} (ALARM when 0 InService) → SNS (same region) → Lambda in ${data.aws_region.dr_primary.name} calls Auto Scaling in ${data.aws_region.secondary.name} to scale DR ASG. CloudFront uses HA-style VPC origins + origin header, and origin group fails over on configured HTTP errors when DR has healthy targets. Toggle subscription with var.dr_route53_automatic_failover."
 }

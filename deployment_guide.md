@@ -14,7 +14,7 @@
 
 - **DR primary** (VPC, ALB, ASG, SNS, …) → `var.aws_region` (**`eu-west-2`**), default **`aws`**.
 
-- **DR secondary** (replica VPC, replica bucket, Lambda, …) → `var.dr_secondary_region` (**`eu-west-3`**), provider **`aws.secondary`**.
+- **DR secondary** (replica VPC, replica bucket, …) → `var.dr_secondary_region` (**`eu-west-3`**), provider **`aws.secondary`**. Failover Lambda is in the **primary** DR region (with SNS), not in `aws.secondary`.
 
 
 
