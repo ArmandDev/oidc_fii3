@@ -169,7 +169,7 @@ resource "aws_s3_object" "background" {
 resource "aws_dynamodb_table" "cloudpulse" {
   provider     = aws.main
   name         = var.main_dynamodb_table_name
-  billing_mode = "PAY_PER_REQUEST" # No capacity planning — you pay only for actual reads/writes
+  billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id"
 
   attribute {
