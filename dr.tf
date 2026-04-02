@@ -162,6 +162,16 @@ locals {
         Condition = { StringEquals = { "kms:ViaService" = "sns.${data.aws_region.dr_primary.name}.amazonaws.com" } }
       },
       {
+        Sid       = "Allow CloudWatch alarm actions to encrypted SNS"
+        Effect    = "Allow"
+        Principal = { Service = "cloudwatch.amazonaws.com" }
+        Action = [
+          "kms:Decrypt", "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext", "kms:DescribeKey"
+        ]
+        Resource  = "*"
+        Condition = { StringEquals = { "kms:CallerAccount" = data.aws_caller_identity.current.account_id } }
+      },
+      {
         Sid       = "Allow Lambda environment encryption"
         Effect    = "Allow"
         Principal = { Service = "lambda.amazonaws.com" }
@@ -1187,6 +1197,11 @@ resource "aws_iam_role_policy" "lambda_dr" {
           "kms:Decrypt", "kms:DescribeKey", "kms:GenerateDataKey", "kms:GenerateDataKeyWithoutPlaintext"
         ]
         Resource = aws_kms_replica_key.dr_kms_replica.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:DescribeKey"]
+        Resource = aws_kms_key.dr_kms_mrk.arn
       }
     ]
   })
